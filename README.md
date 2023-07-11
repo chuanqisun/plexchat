@@ -1,2 +1,3 @@
 # burstio
-Complex task scheduling made easy
+
+A task scheduling library for JavaScript
