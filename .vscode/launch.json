@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run current TypeScript file",
+      "name": "Debug current TypeScript file",
       "request": "launch",
       "runtimeArgs": ["run-script", "env"],
       "runtimeExecutable": "npm",
