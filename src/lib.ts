@@ -1,6 +1,6 @@
 // test code
 
-const { addJob, addWorker } = scheduler({ onPick: handleJobPick, onStart: handleStart, onDone: handleJobSuccess });
+const { addJob, addWorker } = scheduler({ onPick: handlePick, onStart: handleStart, onDone: handleDone });
 
 addJob({ id: 1 });
 addWorker({ id: 1, capacity: 1 });
@@ -11,7 +11,7 @@ addJob({ id: 4 });
 addJob({ id: 5 });
 addJob({ id: 6 });
 
-function handleJobPick(worker: any, jobs: any[]): Assignment | null {
+function handlePick(worker: any, jobs: any[]): Assignment | null {
   // naive implementation
   if (worker.capacity && jobs.length) {
     return { worker, job: jobs[0] };
@@ -46,7 +46,7 @@ function handleStart(assignment: Assignment, state: IState, onDone: () => void):
   };
 }
 
-function handleJobSuccess(assignment: Assignment, state: IState): IState {
+function handleDone(assignment: Assignment, state: IState): IState {
   return {
     ...state,
     workers: state.workers.map((worker) => {
@@ -61,27 +61,30 @@ function handleJobSuccess(assignment: Assignment, state: IState): IState {
   };
 }
 
-interface IState<W = any, J = any> {
-  workers: W[];
-  jobs: J[];
+interface SchedulerConfig<WorkerType = any, JobType = any> {
+  onPick: OnPick<WorkerType, JobType>;
+  onStart: OnStart<WorkerType, JobType>;
+  onDone: OnDone<WorkerType, JobType>;
 }
 
-interface Assignment<W = any, J = any> {
-  worker: W;
-  job: J;
+interface IState<WorkerType = any, JobType = any> {
+  workers: WorkerType[];
+  jobs: JobType[];
 }
 
-type OnJobStart<W = any, J = any> = (assignment: Assignment<W, J>, state: IState<W, J>, onDone: () => void) => IState<W, J>;
-type OnJobDone<W = any, J = any> = (assignment: Assignment<W, J>, state: IState<W, J>) => IState<W, J>;
-
-interface SchedulerConfig<W, J> {
-  onPick: OnPick<W, J>;
-  onStart: OnJobStart<W, J>;
-  onDone: OnJobDone<W, J>;
+interface Assignment<WorkType = any, JobType = any> {
+  worker: WorkType;
+  job: JobType;
 }
 
-type OnPick<W, J> = (worker: W, jobs: J[]) => Assignment<W, J> | null;
-type OnCompareWorkers<W> = (a: W, b: W) => boolean;
+type OnStart<WorkerType = any, JobType = any> = (
+  assignment: Assignment<WorkerType, JobType>,
+  state: IState<WorkerType, JobType>,
+  onDone: () => void
+) => IState<WorkerType, JobType>;
+type OnDone<WorkerType = any, JobType = any> = (assignment: Assignment<WorkerType, JobType>, state: IState<WorkerType, JobType>) => IState<WorkerType, JobType>;
+
+type OnPick<WorkerType, JobType> = (worker: WorkerType, jobs: JobType[]) => Assignment<WorkerType, JobType> | null;
 
 function scheduler<WorkerType, JobType>({ onPick, onStart, onDone }: SchedulerConfig<WorkerType, JobType>) {
   const state: IState<WorkerType, JobType> = {
