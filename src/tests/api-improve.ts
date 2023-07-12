@@ -1,4 +1,4 @@
-import { Assignment, State, scheduler } from "../lib";
+import { Assignment, Run, State, scheduler } from "../lib";
 
 interface BinaryWorker {
   id: number;
@@ -50,7 +50,7 @@ const policy = createPolicy<BinaryWorker>({
 interface PolicyConfig<WorkerType, JobType, ResultType> {
   selectors: Selector<WorkerType, JobType>[];
   beforeRun: StateReducer[];
-  run: any;
+  run: Run<WorkerType, JobType, ResultType>;
   afterRun: StateReducer[];
 }
 
