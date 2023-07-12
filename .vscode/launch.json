@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run current TypeScript file",
+      "request": "launch",
+      "runtimeArgs": ["run-script", "env"],
+      "runtimeExecutable": "npm",
+      "args": ["tsx", "${relativeFile}"],
+      "skipFiles": ["<node_internals>/**"],
+      "type": "node"
+    }
+  ]
+}
