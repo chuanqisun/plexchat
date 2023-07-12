@@ -1,44 +1,34 @@
-export interface SchedulerConfig<WorkerType = any, JobType = any, ResultType = any> {
-  select: Select<WorkerType, JobType>;
-  beforeRun: BeforeRun<WorkerType, JobType>;
-  afterRun: AfterRun<WorkerType, JobType, ResultType>;
-  run: Run<WorkerType, JobType, ResultType>;
+export interface SchedulerConfig<W = any, J = any, R = any> {
+  select: Select<W, J>;
+  beforeRun: BeforeRun<W, J>;
+  afterRun: AfterRun<W, J, R>;
+  run: Run<W, J, R>;
 }
 
-export interface State<WorkerType = any, JobType = any> {
-  workers: WorkerType[];
-  jobs: JobType[];
+export interface State<W = any, J = any> {
+  workers: W[];
+  jobs: J[];
 }
 
-export interface Assignment<WorkType = any, JobType = any> {
-  worker: WorkType;
-  job: JobType;
+export interface Assignment<W = any, J = any> {
+  worker: W;
+  job: J;
 }
 
-export type Run<WorkerType = any, JobType = any, ResultType = any> = (assignment: Assignment<WorkerType, JobType>) => Promise<ResultType>;
+export type Run<W = any, J = any, R = any> = (assignment: Assignment<W, J>) => Promise<R>;
+export type BeforeRun<W = any, J = any> = (assignment: Assignment<W, J>, state: State<W, J>) => State<W, J>;
+export type AfterRun<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, result: R) => State<W, J>;
+export type Select<W, J> = (worker: W, jobs: J[]) => J[];
 
-export type BeforeRun<WorkerType = any, JobType = any> = (
-  assignment: Assignment<WorkerType, JobType>,
-  state: State<WorkerType, JobType>
-) => State<WorkerType, JobType>;
-
-export type AfterRun<WorkerType = any, JobType = any, ResultType = any> = (
-  assignment: Assignment<WorkerType, JobType>,
-  state: State<WorkerType, JobType>,
-  result: ResultType
-) => State<WorkerType, JobType>;
-
-export type Select<WorkerType, JobType> = (worker: WorkerType, jobs: JobType[]) => JobType[];
-
-export function scheduler<WorkerType, JobType>({ select, beforeRun, afterRun, run }: SchedulerConfig<WorkerType, JobType>) {
-  const state: State<WorkerType, JobType> = {
+export function scheduler<W, J>({ select, beforeRun, afterRun, run }: SchedulerConfig<W, J>) {
+  const state: State<W, J> = {
     workers: [],
     jobs: [],
   };
 
   const { update } = observable(onChange, state);
 
-  function addJob(job: JobType) {
+  function addJob(job: J) {
     update((prev) => {
       return {
         ...prev,
@@ -47,7 +37,7 @@ export function scheduler<WorkerType, JobType>({ select, beforeRun, afterRun, ru
     });
   }
 
-  function addWorker(worker: WorkerType) {
+  function addWorker(worker: W) {
     update((prev) => {
       return {
         ...prev,
@@ -56,7 +46,7 @@ export function scheduler<WorkerType, JobType>({ select, beforeRun, afterRun, ru
     });
   }
 
-  function onChange(current: State<WorkerType, JobType>, prev: State<WorkerType, JobType>) {
+  function onChange(current: State<W, J>, prev: State<W, J>) {
     // naive implementation
     let remainingJobs = [...current.jobs];
     const assignments: Assignment[] = [];
@@ -72,7 +62,7 @@ export function scheduler<WorkerType, JobType>({ select, beforeRun, afterRun, ru
     update((prev) => assignments.reduce(assignmentsReducer, prev));
   }
 
-  function assignmentsReducer(state: State<WorkerType, JobType>, assignment: Assignment) {
+  function assignmentsReducer(state: State<W, J>, assignment: Assignment) {
     const updatedState = beforeRun(assignment, state);
     run(assignment).then((result) => update((prev) => afterRun(assignment, prev, result)));
     return updatedState;
