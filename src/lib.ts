@@ -1,6 +1,6 @@
 // test code
 
-const { addJob, addWorker } = scheduler({ onPick: handlePick, onStart: handleStart, onDone: handleDone });
+const { addJob, addWorker } = scheduler({ assign: assign, run: run, beforeRun: beforeRun, afterRun });
 
 addJob({ id: 1 });
 addWorker({ id: 1, capacity: 1 });
@@ -11,7 +11,15 @@ addJob({ id: 4 });
 addJob({ id: 5 });
 addJob({ id: 6 });
 
-function handlePick(worker: any, jobs: any[]): Assignment | null {
+async function run(assignment: Assignment) {
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      Math.random() > 0.5 ? resolve("success") : resolve("error");
+    }, Math.random() * 2500)
+  );
+}
+
+function assign(worker: any, jobs: any[]): Assignment | null {
   // naive implementation
   if (worker.capacity && jobs.length) {
     return { worker, job: jobs[0] };
@@ -24,12 +32,7 @@ function compareById(a: any, b: any) {
   return a.id === b.id;
 }
 
-function handleStart(assignment: Assignment, state: IState, onDone: () => void): IState {
-  setTimeout(() => {
-    console.log("mock work done", { worker: assignment.worker.id, job: assignment.job.id });
-    onDone();
-  }, Math.random() * 2500);
-
+function beforeRun(assignment: Assignment, state: State): State {
   return {
     ...state,
     workers: state.workers.map((worker) => {
@@ -46,7 +49,8 @@ function handleStart(assignment: Assignment, state: IState, onDone: () => void):
   };
 }
 
-function handleDone(assignment: Assignment, state: IState): IState {
+function afterRun(result: any, assignment: Assignment, state: State): State {
+  console.log("mock work done", { worker: assignment.worker.id, job: assignment.job.id, result });
   return {
     ...state,
     workers: state.workers.map((worker) => {
@@ -58,16 +62,19 @@ function handleDone(assignment: Assignment, state: IState): IState {
       }
       return worker;
     }),
+    // return failed job
+    jobs: result === "success" ? state.jobs : [...state.jobs, assignment.job],
   };
 }
 
-interface SchedulerConfig<WorkerType = any, JobType = any> {
-  onPick: OnPick<WorkerType, JobType>;
-  onStart: OnStart<WorkerType, JobType>;
-  onDone: OnDone<WorkerType, JobType>;
+interface SchedulerConfig<WorkerType = any, JobType = any, ResultType = any> {
+  assign: OnPick<WorkerType, JobType>;
+  beforeRun: BeforeRun<WorkerType, JobType>;
+  afterRun: AfterRun<WorkerType, JobType, ResultType>;
+  run: Run<WorkerType, JobType, ResultType>;
 }
 
-interface IState<WorkerType = any, JobType = any> {
+interface State<WorkerType = any, JobType = any> {
   workers: WorkerType[];
   jobs: JobType[];
 }
@@ -77,17 +84,23 @@ interface Assignment<WorkType = any, JobType = any> {
   job: JobType;
 }
 
-type OnStart<WorkerType = any, JobType = any> = (
+type Run<WorkerType = any, JobType = any, ResultType = any> = (assignment: Assignment<WorkerType, JobType>) => Promise<ResultType>;
+
+type BeforeRun<WorkerType = any, JobType = any> = (
   assignment: Assignment<WorkerType, JobType>,
-  state: IState<WorkerType, JobType>,
-  onDone: () => void
-) => IState<WorkerType, JobType>;
-type OnDone<WorkerType = any, JobType = any> = (assignment: Assignment<WorkerType, JobType>, state: IState<WorkerType, JobType>) => IState<WorkerType, JobType>;
+  state: State<WorkerType, JobType>
+) => State<WorkerType, JobType>;
+
+type AfterRun<WorkerType = any, JobType = any, ResultType = any> = (
+  result: ResultType,
+  assignment: Assignment<WorkerType, JobType>,
+  state: State<WorkerType, JobType>
+) => State<WorkerType, JobType>;
 
 type OnPick<WorkerType, JobType> = (worker: WorkerType, jobs: JobType[]) => Assignment<WorkerType, JobType> | null;
 
-function scheduler<WorkerType, JobType>({ onPick, onStart, onDone }: SchedulerConfig<WorkerType, JobType>) {
-  const state: IState<WorkerType, JobType> = {
+function scheduler<WorkerType, JobType>({ assign: onPick, beforeRun, afterRun, run }: SchedulerConfig<WorkerType, JobType>) {
+  const state: State<WorkerType, JobType> = {
     workers: [],
     jobs: [],
   };
@@ -112,7 +125,7 @@ function scheduler<WorkerType, JobType>({ onPick, onStart, onDone }: SchedulerCo
     });
   }
 
-  function onChange(current: IState<WorkerType, JobType>, prev: IState<WorkerType, JobType>) {
+  function onChange(current: State<WorkerType, JobType>, prev: State<WorkerType, JobType>) {
     // naive implementation
     let remainingJobs = [...current.jobs];
     const assignments: Assignment[] = [];
@@ -128,9 +141,10 @@ function scheduler<WorkerType, JobType>({ onPick, onStart, onDone }: SchedulerCo
     update((prev) => assignments.reduce(assignmentsReducer, prev));
   }
 
-  function assignmentsReducer(state: IState<WorkerType, JobType>, assignment: Assignment) {
-    const onDoneInternal = () => update((prev) => onDone(assignment, prev));
-    return onStart(assignment, state, onDoneInternal);
+  function assignmentsReducer(state: State<WorkerType, JobType>, assignment: Assignment) {
+    const updatedState = beforeRun(assignment, state);
+    run(assignment).then((result) => update((prev) => afterRun(result, assignment, prev)));
+    return updatedState;
   }
 
   return {
