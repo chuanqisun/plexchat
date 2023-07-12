@@ -1,27 +1,13 @@
-## Worker
+# Concepts
 
-- Represent capacity to perform a job
-- Can request job from dispatcher
-- Does not report back to dispatcher
+- Parallelism should be dynamic and determined by the worker
+  - To model partial resource comsumption, the worker can immediate rejoin the worker pool if the task does not demand the entire capacity from the worker
+- Worker may reject a task AFTER it accepts it
+  - Task should be returned to the queue and wait for the next available worker
+- Dispatch algorithm should run efficiently
+  - When task pool status changes
+  - When worker pool status changes
+- Upon dispatch, the matched task and the worker should be removed from the corresponding pools
 
-## Queue
-
-- Represents a list of jobs to be done
-
-## Dispatcher
-
-- Dispatches the most fitting job to the worker upon worker's request
-- Accepts jobs from the user
-
-```javascript
-const workers = [new AzureOpenAIChatWorker(), new AzureOpenAIChatWorker(), new AzureOpenAIChatWorker(), new AzureOpenAIChatWorker()];
-
-const magicQueue = new MagicQueue();
-workers.forEach((worker) => worker.join(magicQueue));
-
-const chat = async (message: any) => {
-  const worker = await getWorker(message, queue);
-  const result = await worker.run(message);
-  return result;
-};
-```
+# Algorithm
+  
