@@ -5,7 +5,7 @@ interface BinaryWorker {
   isIdle: boolean;
 }
 
-const { addJob, addWorker } = scheduler<BinaryWorker, any>({ assign, run, beforeRun, afterRun });
+const { addJob, addWorker } = scheduler<BinaryWorker, any>({ select: assign, run, beforeRun, afterRun });
 
 addJob({ id: 1 });
 addWorker({ id: 1, isIdle: true });
@@ -24,12 +24,12 @@ async function run(assignment: Assignment) {
   );
 }
 
-function assign(worker: BinaryWorker, jobs: any[]): Assignment | null {
+function assign(worker: BinaryWorker, jobs: any[]): any[] {
   // naive implementation
   if (worker.isIdle && jobs.length) {
-    return { worker, job: jobs[0] };
+    return [jobs[0]];
   } else {
-    return null;
+    return [];
   }
 }
 
@@ -54,7 +54,7 @@ function beforeRun(assignment: Assignment<BinaryWorker>, state: State<BinaryWork
   };
 }
 
-function afterRun(result: any, assignment: Assignment, state: State<BinaryWorker>): State {
+function afterRun(assignment: Assignment, state: State<BinaryWorker>, result: any): State {
   console.log("mock work done", { worker: assignment.worker.id, job: assignment.job.id, result });
   return {
     ...state,

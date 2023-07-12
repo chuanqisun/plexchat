@@ -11,7 +11,7 @@ interface CostedJobs {
   cost: number;
 }
 
-const { addJob, addWorker } = scheduler<CapacityWorker, CostedJobs>({ assign, run, beforeRun, afterRun });
+const { addJob, addWorker } = scheduler<CapacityWorker, CostedJobs>({ select: assign, run, beforeRun, afterRun });
 
 addJob({ id: 1, cost: 1 });
 addWorker({ id: 1, capacity: 3, activeTasks: [] });
@@ -30,15 +30,15 @@ async function run(assignment: Assignment) {
   );
 }
 
-function assign(worker: CapacityWorker, jobs: CostedJobs[]): Assignment | null {
+function assign(worker: CapacityWorker, jobs: CostedJobs[]): CostedJobs[] {
   // naive implementation
   const remainingCapacity = worker.capacity - worker.activeTasks.reduce((a, b) => a + b.cost, 0);
   const affordableJob = jobs.find((job) => job.cost <= remainingCapacity);
 
   if (affordableJob) {
-    return { worker, job: affordableJob };
+    return [affordableJob];
   } else {
-    return null;
+    return [];
   }
 }
 
@@ -63,7 +63,7 @@ function beforeRun(assignment: Assignment<CapacityWorker>, state: State<Capacity
   };
 }
 
-function afterRun(result: any, assignment: Assignment, state: State<CapacityWorker>): State {
+function afterRun(assignment: Assignment, state: State<CapacityWorker>, result: any): State {
   console.log("mock work done", { worker: assignment.worker.id, job: assignment.job.id, result });
   return {
     ...state,

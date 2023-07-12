@@ -1,12 +1,5 @@
-// test code
-
-// utils
-function updateWorker(predicate: (worker: any) => boolean, updateFn: (worker: any) => any) {}
-function removeJob(predicate: (job: any) => boolean) {}
-function returnJob(predicate: (result: any, job: any) => boolean) {}
-
 export interface SchedulerConfig<WorkerType = any, JobType = any, ResultType = any> {
-  assign: Assign<WorkerType, JobType>;
+  select: Select<WorkerType, JobType>;
   beforeRun: BeforeRun<WorkerType, JobType>;
   afterRun: AfterRun<WorkerType, JobType, ResultType>;
   run: Run<WorkerType, JobType, ResultType>;
@@ -30,14 +23,14 @@ export type BeforeRun<WorkerType = any, JobType = any> = (
 ) => State<WorkerType, JobType>;
 
 export type AfterRun<WorkerType = any, JobType = any, ResultType = any> = (
-  result: ResultType,
   assignment: Assignment<WorkerType, JobType>,
-  state: State<WorkerType, JobType>
+  state: State<WorkerType, JobType>,
+  result: ResultType
 ) => State<WorkerType, JobType>;
 
-export type Assign<WorkerType, JobType> = (worker: WorkerType, jobs: JobType[]) => Assignment<WorkerType, JobType> | null;
+export type Select<WorkerType, JobType> = (worker: WorkerType, jobs: JobType[]) => JobType[];
 
-export function scheduler<WorkerType, JobType>({ assign, beforeRun, afterRun, run }: SchedulerConfig<WorkerType, JobType>) {
+export function scheduler<WorkerType, JobType>({ select, beforeRun, afterRun, run }: SchedulerConfig<WorkerType, JobType>) {
   const state: State<WorkerType, JobType> = {
     workers: [],
     jobs: [],
@@ -69,10 +62,10 @@ export function scheduler<WorkerType, JobType>({ assign, beforeRun, afterRun, ru
     const assignments: Assignment[] = [];
 
     for (const candidate of current.workers) {
-      const assignment = assign(candidate, remainingJobs);
-      if (assignment) {
-        assignments.push(assignment);
-        remainingJobs = remainingJobs.filter((j) => j !== assignment.job);
+      const qualifiedJobs = select(candidate, remainingJobs);
+      if (qualifiedJobs.length) {
+        assignments.push(...qualifiedJobs.map((job) => ({ worker: candidate, job })));
+        remainingJobs = remainingJobs.filter((j) => !qualifiedJobs.includes(j));
       }
     }
 
@@ -81,7 +74,7 @@ export function scheduler<WorkerType, JobType>({ assign, beforeRun, afterRun, ru
 
   function assignmentsReducer(state: State<WorkerType, JobType>, assignment: Assignment) {
     const updatedState = beforeRun(assignment, state);
-    run(assignment).then((result) => update((prev) => afterRun(result, assignment, prev)));
+    run(assignment).then((result) => update((prev) => afterRun(assignment, prev, result)));
     return updatedState;
   }
 
