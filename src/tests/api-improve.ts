@@ -1,4 +1,4 @@
-import { Assignment, Run, State, scheduler } from "../lib";
+import { Assignment, Selector, StateReducer, exposeActions, jobFactory, scheduler, workerFactory } from "../lib";
 
 interface BinaryWorker {
   id: number;
@@ -40,33 +40,14 @@ function requeueJobOnError(): StateReducer<BinaryWorker> {
   };
 }
 
-const policy = createPolicy<BinaryWorker>({
+const { update } = scheduler({
   selectors: [isIdle(), first()],
   beforeRun: [updateWorker((w) => ({ ...w, isBusy: true })), dequeueJob()],
   run,
   afterRun: [updateWorker((w) => ({ ...w, isBusy: false })), requeueJobOnError()],
 });
 
-interface PolicyConfig<W, J, R> {
-  selectors: Selector<W, J>[];
-  beforeRun: StateReducer[];
-  run: Run<W, J, R>;
-  afterRun: StateReducer[];
-}
-
-type Selector<W = any, J = any> = (worker: W, jobs: J[]) => J[];
-type StateReducer<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, result?: R) => State<W, J>;
-
-function createPolicy<W = any, J = any, R = any>(policyConfig: PolicyConfig<W, J, R>) {
-  return {
-    select: (worker: W, jobs: J[]) => policyConfig.selectors.reduce((acc, match) => match(worker, acc), jobs),
-    run: policyConfig.run,
-    beforeRun: (assignment: Assignment<W, J>, state: State<W, J>) => policyConfig.beforeRun.reduce((acc, fn) => fn(assignment, acc), state),
-    afterRun: (assignment: Assignment<W, J>, state: State<W, J>, result: R) => policyConfig.afterRun.reduce((acc, fn) => fn(assignment, acc, result), state),
-  };
-}
-
-const { addJob, addWorker } = scheduler(policy);
+const { addJob, addWorker } = exposeActions(update, [jobFactory(), workerFactory()]);
 
 addJob({ id: 1 });
 addWorker({ id: 1 });
