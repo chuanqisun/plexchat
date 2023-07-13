@@ -1,4 +1,4 @@
-import { Assignment, Selector, StateReducer, exposeActions, jobFactory, scheduler, workerFactory } from "../lib";
+import { Assignment, Selector, StateReducer, UpdateScheduler, scheduler } from "../lib";
 
 interface BinaryWorker {
   id: number;
@@ -44,14 +44,32 @@ function requeueJobOnError(): StateReducer<BinaryWorker> {
   };
 }
 
-const { update } = scheduler({
+function defaultActions<W = any, J = any>() {
+  return (update: UpdateScheduler) => ({
+    addJob: (job: J) =>
+      update((prev) => {
+        return {
+          ...prev,
+          jobs: [...prev.jobs, job],
+        };
+      }),
+    addWorker: (worker: W) =>
+      update((prev) => {
+        return {
+          ...prev,
+          workers: [...prev.workers, worker],
+        };
+      }),
+  });
+}
+
+const { addJob, addWorker } = scheduler({
   selectors: [isIdle(), first()],
   beforeRun: [updateWorker((w) => ({ ...w, isBusy: true })), dequeueJob()],
   run,
   afterRun: [updateWorker((w) => ({ ...w, isBusy: false })), requeueJobOnError()],
+  actions: [defaultActions<BinaryWorker, BasicJob>()],
 });
-
-const { addJob, addWorker } = exposeActions(update, [jobFactory<BasicJob>(), workerFactory<BinaryWorker>()]);
 
 addJob({ id: 1 });
 addWorker({ id: 1 });
