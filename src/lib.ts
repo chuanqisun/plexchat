@@ -62,16 +62,6 @@ export function scheduler<W, J, R>({
   return { update };
 }
 
-type ActionFactory<Return = any> = (update: UpdateScheduler) => Return;
-
-// type MergeReturnTypes<T extends Array<Fn>> = T extends [infer First, ...infer Rest]
-//   ? First extends (...args: any[]) => infer R
-//     ? Rest extends Array<Fn>
-//       ? MergeReturnTypes<Rest> & Omit<R, keyof MergeReturnTypes<Rest>>
-//       : R
-//     : never
-//   : {};
-
 type ReturnTypeOrEmpty<T> = T extends (...args: any[]) => infer R ? R : {};
 
 type MergeReturnTypes<T extends Array<(...args: any) => any>> = T extends [infer F, ...infer Rest]
@@ -88,7 +78,9 @@ export function exposeActions<W, J, B extends ((update: UpdateScheduler) => any)
   return Object.fromEntries(allKeyValPairs) as MergeReturnTypes<B>;
 }
 
-export function jobFactory<J = any>() {
+type ActionFactory<T> = (update: UpdateScheduler) => T;
+
+export function jobFactory<J = any>(): ActionFactory<{ addJob: (job: J) => void }> {
   return (update: UpdateScheduler<any, J>) => ({
     addJob: (job: J) =>
       update((prev) => {
@@ -100,7 +92,7 @@ export function jobFactory<J = any>() {
   });
 }
 
-export function workerFactory<W = any>() {
+export function workerFactory<W = any>(): ActionFactory<{ addWorker: (worker: W) => void }> {
   return (update: UpdateScheduler<W>) => ({
     addWorker: (worker: W) =>
       update((prev) => {

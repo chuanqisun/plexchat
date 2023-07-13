@@ -5,6 +5,10 @@ interface BinaryWorker {
   isBusy?: boolean;
 }
 
+interface BasicJob {
+  id: number;
+}
+
 function isIdle(): Selector<BinaryWorker> {
   return (worker, jobs) => (worker.isBusy ? [] : jobs);
 }
@@ -47,7 +51,7 @@ const { update } = scheduler({
   afterRun: [updateWorker((w) => ({ ...w, isBusy: false })), requeueJobOnError()],
 });
 
-const { addJob, addWorker } = exposeActions(update, [jobFactory(), workerFactory()]);
+const { addJob, addWorker } = exposeActions(update, [jobFactory<BasicJob>(), workerFactory<BinaryWorker>()]);
 
 addJob({ id: 1 });
 addWorker({ id: 1 });
