@@ -1,12 +1,18 @@
 export interface SchedulerConfig<W, J, R> {
-  selectors: Selector<W, J>[];
-  beforeRun: StateReducer[];
+  plexers: Plexer<W, J>[];
+  beforeRun: Transformer[];
   run: Run<W, J, R>;
-  afterRun: StateReducer[];
+  afterRun: Transformer[];
 }
 
-export type Selector<W = any, J = any> = (worker: W, jobs: J[]) => J[];
-export type StateReducer<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, resultOrError?: R) => State<W, J>;
+export type PlexerState<W = any, J = any> = {
+  remainingWorkers: W[];
+  remainingJobs: J[];
+  assignments: Assignment<W, J>[];
+};
+
+export type Plexer<W = any, J = any> = (assignmentState: PlexerState<W, J>, currentState: State<W, J>, previousState: State<W, J>) => PlexerState<W, J>;
+export type Transformer<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, resultOrError?: R) => State<W, J>;
 
 export interface State<W = any, J = any> {
   workers: W[];
@@ -22,7 +28,7 @@ export type Run<W = any, J = any, R = any> = (assignment: Assignment<W, J>) => P
 
 export type UpdateScheduler<W = any, J = any> = (updateFn: (prev: State<W, J>) => State<W, J>) => void;
 
-export function scheduler<W, J, R>({ selectors, beforeRun, run, afterRun }: SchedulerConfig<W, J, R>) {
+export function scheduler<W, J, R>({ beforeRun, run, afterRun, plexers }: SchedulerConfig<W, J, R>) {
   const state: State<W, J> = {
     workers: [],
     jobs: [],
@@ -31,21 +37,13 @@ export function scheduler<W, J, R>({ selectors, beforeRun, run, afterRun }: Sche
   const { update } = observable(onChange, state);
 
   function onChange(current: State<W, J>, prev: State<W, J>) {
-    const initialState = {
-      assignments: [] as Assignment[],
+    const initialStateV2 = {
+      remainingWorkers: [...current.workers],
       remainingJobs: [...current.jobs],
+      assignments: [] as Assignment[],
     };
 
-    const { assignments } = current.workers.reduce((acc, candidate) => {
-      if (!acc.remainingJobs.length) return acc;
-
-      const qualifiedJobs = selectors.reduce((acc, match) => match(candidate, acc), acc.remainingJobs);
-      if (qualifiedJobs.length) {
-        acc.assignments.push(...qualifiedJobs.map((job) => ({ worker: candidate, job })));
-        acc.remainingJobs = acc.remainingJobs.filter((j) => !qualifiedJobs.includes(j));
-      }
-      return acc;
-    }, initialState);
+    const { assignments } = plexers.reduce((acc, plexer) => plexer(acc, current, prev), initialStateV2);
 
     update((prev) => assignments.reduce(assignmentsReducer, prev));
   }

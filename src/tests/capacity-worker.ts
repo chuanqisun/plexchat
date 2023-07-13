@@ -1,5 +1,5 @@
-import { Assignment, Selector, scheduler } from "../lib";
-import { dequeueJob, matchJobById, matchWorkerById, selectFirstJob, updateWorker } from "../utils";
+import { Assignment, scheduler } from "../lib";
+import { Selector, dequeueJob, matchJobById, matchWorkerById, selectFirstJob, selectJobsPerWorker, updateWorker } from "../utils";
 
 interface CapacityWorker {
   id: number;
@@ -14,7 +14,7 @@ interface CapacityJob {
 
 const { addJob, addWorker } = scheduler({
   run,
-  selectors: [greedyCapacityFill(), selectFirstJob()],
+  plexers: [selectJobsPerWorker([greedyCapacityFill(), selectFirstJob()])],
   beforeRun: [
     updateWorker<CapacityWorker>(matchWorkerById(), (w, assignment) => ({ ...w, activeJobs: [...w.activeJobs, assignment.job] })),
     dequeueJob(matchJobById()),

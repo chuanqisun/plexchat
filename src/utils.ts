@@ -1,25 +1,25 @@
-import { Assignment, Selector, StateReducer, UpdateScheduler } from "./lib";
+import { Assignment, Plexer, PlexerState, Transformer, UpdateScheduler } from "./lib";
 
 // State reducers
 
 export function updateWorker<W = any, J = any>(
   predicate: (candidateWorker: W, assignment: Assignment<W, J>) => boolean,
   updateFn: (worker: W, assignment: Assignment<W, J>) => W
-): StateReducer<W> {
+): Transformer<W> {
   return (assignment, state) => ({
     ...state,
     workers: state.workers.map((worker) => (predicate(worker, assignment) ? updateFn(worker, assignment) : worker)),
   });
 }
 
-export function dequeueJob<W = any, J = any>(predicate: (candidateJob: J, assignment: Assignment<any, J>) => boolean): StateReducer<W, J> {
+export function dequeueJob<W = any, J = any>(predicate: (candidateJob: J, assignment: Assignment<any, J>) => boolean): Transformer<W, J> {
   return (assignment, state) => ({
     ...state,
     jobs: state.jobs.filter((job) => !predicate(job, assignment)),
   });
 }
 
-export function requeueJob<W, J, R>(predicate: (candidateJob: J, assignment: Assignment<W, J>, result?: R) => boolean): StateReducer<W, J, R> {
+export function requeueJob<W, J, R>(predicate: (candidateJob: J, assignment: Assignment<W, J>, result?: R) => boolean): Transformer<W, J, R> {
   return (assignment, state, result) => {
     if (predicate(assignment.job, assignment, result)) {
       return {
@@ -31,7 +31,29 @@ export function requeueJob<W, J, R>(predicate: (candidateJob: J, assignment: Ass
   };
 }
 
-// Selectors
+// Plexers
+
+export type Selector<W = any, J = any> = (worker: W, jobs: J[]) => J[];
+export function selectJobsPerWorker<W, J>(selectors: Selector<W, J>[]): Plexer<W, J> {
+  return (assignmentState, currentState, previousState) => {
+    const result: PlexerState<W, J> = {
+      assignments: [...assignmentState.assignments],
+      remainingWorkers: [...currentState.workers],
+      remainingJobs: [...currentState.jobs],
+    };
+
+    return result.remainingWorkers.reduce((acc, candidate) => {
+      if (!acc.remainingJobs.length) return acc;
+
+      const qualifiedJobs = selectors.reduce((acc, match) => match(candidate, acc), acc.remainingJobs);
+      if (qualifiedJobs.length) {
+        acc.assignments.push(...qualifiedJobs.map((job) => ({ worker: candidate, job })));
+        acc.remainingJobs = acc.remainingJobs.filter((j) => !qualifiedJobs.includes(j));
+      }
+      return acc;
+    }, result);
+  };
+}
 
 export function selectWorker<W>(predicate: (candidateWorker: W) => boolean): Selector<W> {
   return (worker, jobs) => (predicate(worker) ? jobs : []);
