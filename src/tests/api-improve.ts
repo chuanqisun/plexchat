@@ -1,4 +1,5 @@
-import { Assignment, Selector, StateReducer, UpdateScheduler, scheduler } from "../lib";
+import { Assignment, scheduler } from "../lib";
+import { defaultActions, dequeueJob, matchById, matchResult, requeueJob, selectFirstJob, selectWorker, updateWorker } from "../utils";
 
 interface BinaryWorker {
   id: number;
@@ -9,65 +10,13 @@ interface BasicJob {
   id: number;
 }
 
-function isIdle(): Selector<BinaryWorker> {
-  return (worker, jobs) => (worker.isBusy ? [] : jobs);
-}
-
-function first(): Selector<BinaryWorker> {
-  return (_worker, jobs) => (jobs.length ? [jobs[0]] : []);
-}
-
-function updateWorker(updateFn: (worker: BinaryWorker) => BinaryWorker): StateReducer<BinaryWorker> {
-  return (assignment, state) => ({
-    ...state,
-    workers: state.workers.map((worker) => (worker.id === assignment.worker.id ? updateFn(worker) : worker)),
-  });
-}
-
-function dequeueJob(): StateReducer<BinaryWorker> {
-  return (assignment, state) => ({
-    ...state,
-    jobs: state.jobs.filter((job) => job.id !== assignment.job.id),
-  });
-}
-
-function requeueJobOnError(): StateReducer<BinaryWorker> {
-  return (assignment, state, result) => {
-    if (result === "error") {
-      return {
-        ...state,
-        jobs: [...state.jobs, assignment.job],
-      };
-    } else {
-      return state;
-    }
-  };
-}
-
-function defaultActions<W = any, J = any>() {
-  return (update: UpdateScheduler) => ({
-    addJob: (job: J) =>
-      update((prev) => {
-        return {
-          ...prev,
-          jobs: [...prev.jobs, job],
-        };
-      }),
-    addWorker: (worker: W) =>
-      update((prev) => {
-        return {
-          ...prev,
-          workers: [...prev.workers, worker],
-        };
-      }),
-  });
-}
+const isError = (result: any) => result === "error";
 
 const { addJob, addWorker } = scheduler({
-  selectors: [isIdle(), first()],
-  beforeRun: [updateWorker((w) => ({ ...w, isBusy: true })), dequeueJob()],
   run,
-  afterRun: [updateWorker((w) => ({ ...w, isBusy: false })), requeueJobOnError()],
+  selectors: [selectWorker<BinaryWorker>((w) => !w.isBusy), selectFirstJob()],
+  beforeRun: [updateWorker(matchById(), (w) => ({ ...w, isBusy: true })), dequeueJob(matchById())],
+  afterRun: [updateWorker(matchById(), (w) => ({ ...w, isBusy: false })), requeueJob(matchResult(isError))],
   actions: [defaultActions<BinaryWorker, BasicJob>()],
 });
 
