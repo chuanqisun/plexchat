@@ -1,4 +1,4 @@
-export interface PolicyConfig<W, J, R, A extends Array<ActionFactory<W, J>>> {
+export interface SchedulerConfig<W, J, R, A extends Array<ActionFactory<W, J>>> {
   selectors: Selector<W, J>[];
   beforeRun: StateReducer[];
   run: Run<W, J, R>;
@@ -23,7 +23,7 @@ export type Run<W = any, J = any, R = any> = (assignment: Assignment<W, J>) => P
 
 export type UpdateScheduler<W = any, J = any> = (updateFn: (prev: State<W, J>) => State<W, J>) => void;
 
-export function scheduler<W, J, R, A extends Array<ActionFactory<W, J>>>({ selectors, beforeRun, run, afterRun, actions }: PolicyConfig<W, J, R, A>) {
+export function scheduler<W, J, R, A extends Array<ActionFactory<W, J>>>({ selectors, beforeRun, run, afterRun, actions }: SchedulerConfig<W, J, R, A>) {
   const state: State<W, J> = {
     workers: [],
     jobs: [],
@@ -32,17 +32,21 @@ export function scheduler<W, J, R, A extends Array<ActionFactory<W, J>>>({ selec
   const { update } = observable(onChange, state);
 
   function onChange(current: State<W, J>, prev: State<W, J>) {
-    // naive implementation
-    let remainingJobs = [...current.jobs];
-    const assignments: Assignment[] = [];
+    const initialState = {
+      assignments: [] as Assignment[],
+      remainingJobs: [...current.jobs],
+    };
 
-    for (const candidate of current.workers) {
-      const qualifiedJobs = selectors.reduce((acc, match) => match(candidate, acc), remainingJobs);
+    const { assignments } = current.workers.reduce((acc, candidate) => {
+      if (!acc.remainingJobs.length) return acc;
+
+      const qualifiedJobs = selectors.reduce((acc, match) => match(candidate, acc), acc.remainingJobs);
       if (qualifiedJobs.length) {
-        assignments.push(...qualifiedJobs.map((job) => ({ worker: candidate, job })));
-        remainingJobs = remainingJobs.filter((j) => !qualifiedJobs.includes(j));
+        acc.assignments.push(...qualifiedJobs.map((job) => ({ worker: candidate, job })));
+        acc.remainingJobs = acc.remainingJobs.filter((j) => !qualifiedJobs.includes(j));
       }
-    }
+      return acc;
+    }, initialState);
 
     update((prev) => assignments.reduce(assignmentsReducer, prev));
   }
