@@ -47,28 +47,22 @@ const policy = createPolicy<BinaryWorker>({
   afterRun: [updateWorker((w) => ({ ...w, isBusy: false })), requeueJobOnError()],
 });
 
-interface PolicyConfig<WorkerType, JobType, ResultType> {
-  selectors: Selector<WorkerType, JobType>[];
+interface PolicyConfig<W, J, R> {
+  selectors: Selector<W, J>[];
   beforeRun: StateReducer[];
-  run: Run<WorkerType, JobType, ResultType>;
+  run: Run<W, J, R>;
   afterRun: StateReducer[];
 }
 
-type Selector<WorkerType = any, JobType = any> = (worker: WorkerType, jobs: JobType[]) => JobType[];
-type StateReducer<WorkerType = any, JobType = any, ResultType = any> = (
-  assignment: Assignment<WorkerType, JobType>,
-  state: State<WorkerType, JobType>,
-  result?: ResultType
-) => State<WorkerType, JobType>;
+type Selector<W = any, J = any> = (worker: W, jobs: J[]) => J[];
+type StateReducer<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, result?: R) => State<W, J>;
 
-function createPolicy<WorkerType = any, JobType = any, ResultType = any>(policyConfig: PolicyConfig<WorkerType, JobType, ResultType>) {
+function createPolicy<W = any, J = any, R = any>(policyConfig: PolicyConfig<W, J, R>) {
   return {
-    select: (worker: WorkerType, jobs: JobType[]) => policyConfig.selectors.reduce((acc, match) => match(worker, acc), jobs),
+    select: (worker: W, jobs: J[]) => policyConfig.selectors.reduce((acc, match) => match(worker, acc), jobs),
     run: policyConfig.run,
-    beforeRun: (assignment: Assignment<WorkerType, JobType>, state: State<WorkerType, JobType>) =>
-      policyConfig.beforeRun.reduce((acc, fn) => fn(assignment, acc), state),
-    afterRun: (assignment: Assignment<WorkerType, JobType>, state: State<WorkerType, JobType>, result: ResultType) =>
-      policyConfig.afterRun.reduce((acc, fn) => fn(assignment, acc, result), state),
+    beforeRun: (assignment: Assignment<W, J>, state: State<W, J>) => policyConfig.beforeRun.reduce((acc, fn) => fn(assignment, acc), state),
+    afterRun: (assignment: Assignment<W, J>, state: State<W, J>, result: R) => policyConfig.afterRun.reduce((acc, fn) => fn(assignment, acc, result), state),
   };
 }
 
