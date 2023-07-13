@@ -1,13 +1,12 @@
-export interface SchedulerConfig<W, J, R, A extends Array<ActionFactory<W, J>>> {
+export interface SchedulerConfig<W, J, R> {
   selectors: Selector<W, J>[];
   beforeRun: StateReducer[];
   run: Run<W, J, R>;
   afterRun: StateReducer[];
-  actions: [...A];
 }
 
 export type Selector<W = any, J = any> = (worker: W, jobs: J[]) => J[];
-export type StateReducer<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, result?: R) => State<W, J>;
+export type StateReducer<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, resultOrError?: R) => State<W, J>;
 
 export interface State<W = any, J = any> {
   workers: W[];
@@ -23,7 +22,7 @@ export type Run<W = any, J = any, R = any> = (assignment: Assignment<W, J>) => P
 
 export type UpdateScheduler<W = any, J = any> = (updateFn: (prev: State<W, J>) => State<W, J>) => void;
 
-export function scheduler<W, J, R, A extends Array<ActionFactory<W, J>>>({ selectors, beforeRun, run, afterRun, actions }: SchedulerConfig<W, J, R, A>) {
+export function scheduler<W, J, R>({ selectors, beforeRun, run, afterRun }: SchedulerConfig<W, J, R>) {
   const state: State<W, J> = {
     workers: [],
     jobs: [],
@@ -53,23 +52,35 @@ export function scheduler<W, J, R, A extends Array<ActionFactory<W, J>>>({ selec
 
   function assignmentsReducer(state: State<W, J>, assignment: Assignment) {
     const updatedState = beforeRun.reduce((acc, fn) => fn(assignment, acc), state);
-    run(assignment).then((result) => update((prev) => afterRun.reduce((acc, fn) => fn(assignment, acc, result), prev)));
+    run(assignment)
+      .catch((e) => e)
+      .then((result) => update((prev) => afterRun.reduce((acc, fn) => fn(assignment, acc, result), prev)));
     return updatedState;
   }
 
-  const bonds = Object.fromEntries(actions.map((action) => action(update)).flatMap(Object.entries)) as MergeReturnTypes<A>;
-  return bonds;
+  function addJob(...jobs: J[]) {
+    update((prev) => {
+      return {
+        ...prev,
+        jobs: [...prev.jobs, ...jobs].filter((j, i, arr) => arr.indexOf(j) === i),
+      };
+    });
+  }
+
+  function addWorker(...workers: W[]) {
+    update((prev) => {
+      return {
+        ...prev,
+        workers: [...prev.workers, ...workers].filter((w, i, arr) => arr.indexOf(w) === i),
+      };
+    });
+  }
+
+  return {
+    addJob,
+    addWorker,
+  };
 }
-
-type ReturnTypeOrEmpty<T> = T extends (...args: any[]) => infer R ? R : {};
-
-type MergeReturnTypes<T extends Array<(...args: any) => any>> = T extends [infer F, ...infer Rest]
-  ? Rest extends Array<(...args: any) => any>
-    ? ReturnTypeOrEmpty<F> & Omit<MergeReturnTypes<Rest>, keyof ReturnTypeOrEmpty<F>>
-    : ReturnTypeOrEmpty<F>
-  : {};
-
-export type ActionFactory<W = any, J = any, T = any> = (update: UpdateScheduler<W, J>) => T;
 
 function observable<T>(onChange: (current: T, previous: T) => any, initialValue: T) {
   let state = initialValue;

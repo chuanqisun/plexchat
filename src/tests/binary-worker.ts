@@ -1,5 +1,5 @@
 import { Assignment, scheduler } from "../lib";
-import { defaultActions, dequeueJob, matchJobById, matchWorkerById, selectFirstJob, selectWorker, updateWorker } from "../utils";
+import { dequeueJob, matchJobById, matchWorkerById, selectFirstJob, selectWorker, updateWorker } from "../utils";
 
 interface BinaryWorker {
   id: number;
@@ -15,7 +15,6 @@ const { addJob, addWorker } = scheduler({
   selectors: [selectWorker<BinaryWorker>((w) => !w.isBusy), selectFirstJob()],
   beforeRun: [updateWorker<BinaryWorker>(matchWorkerById(), (w) => ({ ...w, isBusy: true })), dequeueJob(matchJobById<BasicJob>())],
   afterRun: [updateWorker<BinaryWorker>(matchWorkerById(), (w) => ({ ...w, isBusy: false }))],
-  actions: [defaultActions<BinaryWorker, BasicJob>()],
 });
 
 addJob({ id: 1 });

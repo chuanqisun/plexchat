@@ -1,5 +1,5 @@
 import { Assignment, Selector, scheduler } from "../lib";
-import { defaultActions, dequeueJob, matchJobById, matchWorkerById, selectFirstJob, updateWorker } from "../utils";
+import { dequeueJob, matchJobById, matchWorkerById, selectFirstJob, updateWorker } from "../utils";
 
 interface CapacityWorker {
   id: number;
@@ -20,7 +20,6 @@ const { addJob, addWorker } = scheduler({
     dequeueJob(matchJobById()),
   ],
   afterRun: [updateWorker(matchWorkerById(), (w, assignment) => ({ ...w, activeJobs: w.activeJobs.filter((j) => j.id !== assignment.job.id) }))],
-  actions: [defaultActions<CapacityWorker, CapacityJob>()],
 });
 
 addJob({ id: 1, cost: 1 });
