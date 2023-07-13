@@ -1,27 +1,27 @@
 import { Assignment, Plexer, PlexerState, Transformer, UpdateScheduler } from "./lib";
 
-// State reducers
+// Transformers
 
 export function updateWorker<W = any, J = any>(
   predicate: (candidateWorker: W, assignment: Assignment<W, J>) => boolean,
   updateFn: (worker: W, assignment: Assignment<W, J>) => W
 ): Transformer<W> {
-  return (assignment, state) => ({
+  return ({ assignment, state }) => ({
     ...state,
     workers: state.workers.map((worker) => (predicate(worker, assignment) ? updateFn(worker, assignment) : worker)),
   });
 }
 
 export function dequeueJob<W = any, J = any>(predicate: (candidateJob: J, assignment: Assignment<any, J>) => boolean): Transformer<W, J> {
-  return (assignment, state) => ({
+  return ({ assignment, state }) => ({
     ...state,
     jobs: state.jobs.filter((job) => !predicate(job, assignment)),
   });
 }
 
 export function requeueJob<W, J, R>(predicate: (candidateJob: J, assignment: Assignment<W, J>, result?: R) => boolean): Transformer<W, J, R> {
-  return (assignment, state, result) => {
-    if (predicate(assignment.job, assignment, result)) {
+  return ({ assignment, state, result: resultOrError }) => {
+    if (predicate(assignment.job, assignment, resultOrError)) {
       return {
         ...state,
         jobs: [...state.jobs, assignment.job],
@@ -34,8 +34,9 @@ export function requeueJob<W, J, R>(predicate: (candidateJob: J, assignment: Ass
 // Plexers
 
 export type Selector<W = any, J = any> = (worker: W, jobs: J[]) => J[];
-export function selectJobsPerWorker<W, J>(selectors: Selector<W, J>[]): Plexer<W, J> {
-  return (assignmentState, currentState, previousState) => {
+
+export function selectJobsPerWorker<W = any, J = any>(selectors: Selector<W, J>[]): Plexer<W, J> {
+  return ({ assignmentState, currentState }) => {
     const result: PlexerState<W, J> = {
       assignments: [...assignmentState.assignments],
       remainingWorkers: [...currentState.workers],

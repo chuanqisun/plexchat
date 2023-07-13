@@ -11,8 +11,21 @@ export type PlexerState<W = any, J = any> = {
   assignments: Assignment<W, J>[];
 };
 
-export type Plexer<W = any, J = any> = (assignmentState: PlexerState<W, J>, currentState: State<W, J>, previousState: State<W, J>) => PlexerState<W, J>;
-export type Transformer<W = any, J = any, R = any> = (assignment: Assignment<W, J>, state: State<W, J>, resultOrError?: R) => State<W, J>;
+export interface PlexerInput<W = any, J = any> {
+  assignmentState: PlexerState<W, J>;
+  currentState: State<W, J>;
+  previousState: State<W, J>;
+}
+export type Plexer<W = any, J = any> = (input: PlexerInput<W, J>) => PlexerState<W, J>;
+
+export interface TransformerInput<W = any, J = any, R = any> {
+  assignment: Assignment<W, J>;
+  state: State<W, J>;
+  update: (updateFn: (prev: State<W, J>) => State<W, J>) => any;
+  result?: R;
+  error?: any;
+}
+export type Transformer<W = any, J = any, R = any> = (input: TransformerInput<W, J, R>) => State<W, J>;
 
 export interface State<W = any, J = any> {
   workers: W[];
@@ -37,22 +50,23 @@ export function scheduler<W, J, R>({ beforeRun, run, afterRun, plexers }: Schedu
   const { update } = observable(onChange, state);
 
   function onChange(current: State<W, J>, prev: State<W, J>) {
-    const initialStateV2 = {
+    const initialStateV2: PlexerState<W, J> = {
       remainingWorkers: [...current.workers],
       remainingJobs: [...current.jobs],
-      assignments: [] as Assignment[],
+      assignments: [],
     };
 
-    const { assignments } = plexers.reduce((acc, plexer) => plexer(acc, current, prev), initialStateV2);
+    const { assignments } = plexers.reduce((acc, plexer) => plexer({ assignmentState: acc, currentState: current, previousState: prev }), initialStateV2);
 
     update((prev) => assignments.reduce(assignmentsReducer, prev));
   }
 
   function assignmentsReducer(state: State<W, J>, assignment: Assignment) {
-    const updatedState = beforeRun.reduce((acc, fn) => fn(assignment, acc), state);
-    run(assignment)
-      .catch((e) => e)
-      .then((result) => update((prev) => afterRun.reduce((acc, fn) => fn(assignment, acc, result), prev)));
+    const updatedState = beforeRun.reduce((acc, fn) => fn({ assignment, state: acc, update }), state);
+    run(assignment).then(
+      (result) => update((prev) => afterRun.reduce((acc, fn) => fn({ assignment, state: acc, result, update }), prev)),
+      (error) => update((prev) => afterRun.reduce((acc, fn) => fn({ assignment, state: acc, error, update }), prev))
+    );
     return updatedState;
   }
 
@@ -77,6 +91,7 @@ export function scheduler<W, J, R>({ beforeRun, run, afterRun, plexers }: Schedu
   return {
     addJob,
     addWorker,
+    update,
   };
 }
 
