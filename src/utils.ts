@@ -1,24 +1,27 @@
-// toolkit
+import { Assignment, Selector, StateReducer, UpdateScheduler } from "./lib";
 
-import { Selector, StateReducer, UpdateScheduler } from "./lib";
+// State reducers
 
-export function updateWorker<W>(predicate: (candidateWorker: W, assignmentWorker: W) => boolean, updateFn: (worker: W) => W): StateReducer<W> {
+export function updateWorker<W = any, J = any>(
+  predicate: (candidateWorker: W, assignment: Assignment<W, J>) => boolean,
+  updateFn: (worker: W, assignment: Assignment<W, J>) => W
+): StateReducer<W> {
   return (assignment, state) => ({
     ...state,
-    workers: state.workers.map((worker) => (predicate(worker, assignment.worker) ? updateFn(worker) : worker)),
+    workers: state.workers.map((worker) => (predicate(worker, assignment) ? updateFn(worker, assignment) : worker)),
   });
 }
 
-export function dequeueJob<J>(predicate: (candidateJob: J, assignmentJob: J) => boolean): StateReducer<unknown, J> {
+export function dequeueJob<W = any, J = any>(predicate: (candidateJob: J, assignment: Assignment<any, J>) => boolean): StateReducer<W, J> {
   return (assignment, state) => ({
     ...state,
-    jobs: state.jobs.filter((job) => !predicate(job, assignment.job)),
+    jobs: state.jobs.filter((job) => !predicate(job, assignment)),
   });
 }
 
-export function requeueJob<J, R>(predicate: (candidateJob: J, assignmentJob: J, result?: R) => boolean): StateReducer<unknown, J, R> {
+export function requeueJob<W, J, R>(predicate: (candidateJob: J, assignment: Assignment<W, J>, result?: R) => boolean): StateReducer<W, J, R> {
   return (assignment, state, result) => {
-    if (predicate(assignment.job, assignment.job, result)) {
+    if (predicate(assignment.job, assignment, result)) {
       return {
         ...state,
         jobs: [...state.jobs, assignment.job],
@@ -28,6 +31,8 @@ export function requeueJob<J, R>(predicate: (candidateJob: J, assignmentJob: J, 
   };
 }
 
+// Selectors
+
 export function selectWorker<W>(predicate: (candidateWorker: W) => boolean): Selector<W> {
   return (worker, jobs) => (predicate(worker) ? jobs : []);
 }
@@ -35,6 +40,8 @@ export function selectWorker<W>(predicate: (candidateWorker: W) => boolean): Sel
 export function selectFirstJob(): Selector {
   return (_worker, jobs) => (jobs.length ? [jobs[0]] : []);
 }
+
+// Actions
 
 export function defaultActions<W = any, J = any>() {
   return (update: UpdateScheduler<W, J>) => ({
@@ -55,8 +62,14 @@ export function defaultActions<W = any, J = any>() {
   });
 }
 
-export function matchById<T extends { id: any }>() {
-  return (a: T, b: T) => a.id === b.id;
+// Predicates
+
+export function matchWorkerById<T extends { id: any }>() {
+  return (worker: T, assignment: Assignment<T>) => worker.id === assignment.worker.id;
+}
+
+export function matchJobById<T extends { id: any }>() {
+  return (job: T, assignment: Assignment<T>) => job.id === assignment.job.id;
 }
 
 export function matchResult(predicate: (result: any) => boolean) {

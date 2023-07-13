@@ -1,5 +1,5 @@
 import { Assignment, scheduler } from "../lib";
-import { defaultActions, dequeueJob, matchById, matchResult, requeueJob, selectFirstJob, selectWorker, updateWorker } from "../utils";
+import { defaultActions, dequeueJob, matchJobById, matchResult, matchWorkerById, requeueJob, selectFirstJob, selectWorker, updateWorker } from "../utils";
 
 interface BinaryWorker {
   id: number;
@@ -15,8 +15,8 @@ const isError = (result: any) => result === "error";
 const { addJob, addWorker } = scheduler({
   run,
   selectors: [selectWorker<BinaryWorker>((w) => !w.isBusy), selectFirstJob()],
-  beforeRun: [updateWorker(matchById(), (w) => ({ ...w, isBusy: true })), dequeueJob(matchById())],
-  afterRun: [updateWorker(matchById(), (w) => ({ ...w, isBusy: false })), requeueJob(matchResult(isError))],
+  beforeRun: [updateWorker<BinaryWorker>(matchWorkerById(), (w) => ({ ...w, isBusy: true })), dequeueJob(matchJobById<BasicJob>())],
+  afterRun: [updateWorker<BinaryWorker>(matchWorkerById(), (w) => ({ ...w, isBusy: false })), requeueJob(matchResult(isError))],
   actions: [defaultActions<BinaryWorker, BasicJob>()],
 });
 
