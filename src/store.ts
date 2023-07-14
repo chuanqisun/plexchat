@@ -52,7 +52,7 @@ export function createStore<T extends NonNullable<any>>(plugins: Plugin<T>[]) {
         let isAborted = false;
         const updatedState = hook({ current: acc.state, previous, abort: () => (isAborted = true), update });
 
-        return { state: updatedState, isAborted };
+        return { state: isAborted ? acc.state : updatedState, isAborted };
       },
       { isAborted: false, state: current }
     );
@@ -66,11 +66,15 @@ export function createStore<T extends NonNullable<any>>(plugins: Plugin<T>[]) {
 
   function update(updateFn: (prev: T) => T) {
     const prev = state;
-    state = onTransformChange(updateFn(prev), prev).state;
+    const transformed = onTransformChange(updateFn(prev), prev);
+    if (transformed.isAborted) return;
+
+    state = transformed.state;
     onDidChange(state, prev);
   }
 
   return {
+    getState: () => state,
     update,
   };
 }
