@@ -1,66 +1,136 @@
+import { solvePackingProblem } from "./packing";
 import { createStore } from "./store";
 
-export interface Scheduler {
-  update: () => {};
+interface SchedulerState {
+  requests: ChatRequest[];
+  endpoints: ChatEndpoint[];
 }
 
-interface State<J, W> {
-  jobs: J[];
-  workers: W[];
+interface ChatRequest {
+  id: number;
+  message: string;
+  tokenDemand: number;
+  callback: (result: string) => void;
+}
+interface ChatEndpoint {
+  request: (message: string) => Promise<string>;
+  tokenLimit: number;
+  pendingTokenBlocks: {
+    id: number;
+    demand: number;
+  }[];
 }
 
-interface Plugin<J, W> {
-  onInit?: (input: HookInput<J, W>) => State<J, W>;
-  onTransformChange?: (input: HookInput<J, W>) => State<J, W>;
-  onDidChange?: (input: HookInput<J, W>) => State<J, W>;
-  onShouldSkipChange?: (input: HookInput<J, W>) => boolean;
+const chat = multiplexedChat([
+  {
+    request: async (message) => {
+      return new Promise((resolve, reject) => {
+        const box = { resolve, reject };
+        const method = Math.random() > 0.5 ? "resolve" : "reject";
+        setTimeout(() => box[method](`worker 1: ${method} response to ${message}`), Math.random() * 2000);
+      });
+    },
+    tokenLimit: 4000,
+    pendingTokenBlocks: [],
+  },
+  {
+    request: async (message) => {
+      return new Promise((resolve, reject) => {
+        const box = { resolve, reject };
+        const method = Math.random() > 0.5 ? "resolve" : "reject";
+        setTimeout(() => box[method](`worker 2: ${method} response to ${message}`), Math.random() * 2000);
+      });
+    },
+    tokenLimit: 6000,
+    pendingTokenBlocks: [],
+  },
+]);
+
+chat("Hello", 3000).then(console.log);
+chat("Hello 2", 4000).then(console.log);
+chat("Hello 3", 2000).then(console.log);
+chat("Hello 4", 5000).then(console.log);
+chat("Hello 5", 1000).then(console.log);
+
+export function multiplexedChat(endpoints: ChatEndpoint[]) {
+  const store = createStore<SchedulerState>([
+    {
+      onInit: () => ({
+        requests: [],
+        endpoints,
+      }),
+    },
+    {
+      onTransformChange: ({ current, update }) => {
+        let remainingRequests = [...current.requests];
+        const assignments: { chat: ChatRequest; endpoint: ChatEndpoint }[] = [];
+
+        current.endpoints.forEach((endpoint) => {
+          if (!remainingRequests.length) return;
+
+          const affordableRequests = optimalFill(endpoint, remainingRequests);
+          endpoint.pendingTokenBlocks = affordableRequests.map((request) => ({
+            id: request.id,
+            demand: request.tokenDemand,
+          }));
+          remainingRequests = remainingRequests.filter((request) => !affordableRequests.includes(request));
+          assignments.push(...affordableRequests.map((request) => ({ chat: request, endpoint })));
+        });
+
+        current.requests = remainingRequests;
+
+        // run all assignments
+        assignments.forEach(({ chat, endpoint }) => {
+          endpoint.request(chat.message).then(
+            (result) => {
+              update((prev) => {
+                const endpointIndex = prev.endpoints.indexOf(endpoint);
+                prev.endpoints[endpointIndex].pendingTokenBlocks = prev.endpoints[endpointIndex].pendingTokenBlocks.filter((block) => block.id !== chat.id);
+                return prev;
+              });
+              chat.callback(result);
+            },
+            () => {
+              update((prev) => {
+                const endpointIndex = prev.endpoints.indexOf(endpoint);
+                prev.endpoints[endpointIndex].pendingTokenBlocks = prev.endpoints[endpointIndex].pendingTokenBlocks.filter((block) => block.id !== chat.id);
+                prev.requests.push(chat);
+                return prev;
+              });
+            }
+          );
+        });
+
+        return current;
+      },
+    },
+  ]);
+
+  let currentId = 0;
+
+  async function chat(message: string, tokenDemand: number) {
+    return new Promise((resolve) => {
+      store.update((prev) => {
+        prev.requests.push({
+          id: ++currentId,
+          message,
+          tokenDemand,
+          callback: (result) => {
+            resolve(result);
+          },
+        });
+        return prev;
+      });
+    });
+  }
+
+  return chat;
 }
 
-interface HookInput<J, W> {
-  current: State<J, W>;
-  previous: State<J, W>;
-  update: Update<J, W>;
-}
-
-export type Update<J, W> = (updateFn: (prev: State<J, W>) => State<J, W>) => void;
-
-export function createScheduler<J, W>(plugins: Plugin<J, W>[]): Update<J, W> {
-  const emptyState: State<J, W> = {
-    jobs: [],
-    workers: [],
-  };
-
-  const initialState = plugins
-    .map((plugin) => plugin.onInit!)
-    .reduce<State<J, W>>((acc, hook) => {
-      return hook({ current: acc, previous: emptyState, update: () => {} });
-    }, emptyState);
-
-  const onTransformChange = (current, previous) =>
-    plugins
-      .map((plugin) => plugin.onTransformChange!)
-      .filter(Boolean)
-      .reduce((acc, hook) => hook({ current: acc, previous, update }), current);
-
-  const onShouldSkipChange = (current, previous) =>
-    plugins
-      .map((plugin) => plugin.onShouldSkipChange!)
-      .filter(Boolean)
-      .every((hook) => hook({ current, previous, update }));
-
-  const onDidChange = (current: State<J, W>, previous: State<J, W>) => {
-    plugins
-      .map((plugin) => plugin.onDidChange!)
-      .filter(Boolean)
-      .forEach((hook) => hook({ current, previous, update }));
-  };
-
-  const { update } = createStore<State<J, W>>({
-    onDidChange,
-    onShouldSkipChange,
-    onTransformChange,
-    initialState,
-  });
-
-  return update;
+function optimalFill(endpoint: ChatEndpoint, requests: ChatRequest[]) {
+  const pickedIndices = solvePackingProblem(
+    endpoint.tokenLimit,
+    requests.map((request) => request.tokenDemand)
+  );
+  return pickedIndices.map((index) => requests[index]);
 }
