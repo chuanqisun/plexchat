@@ -1,4 +1,4 @@
-import { solvePackingProblem } from "./packing";
+import { dfsPack } from "./packing";
 import { createStore } from "./store";
 
 interface SchedulerState {
@@ -68,7 +68,7 @@ export function multiplexedChat(endpoints: ChatEndpoint[]) {
         current.endpoints.forEach((endpoint) => {
           if (!remainingRequests.length) return;
 
-          const affordableRequests = optimalFill(endpoint, remainingRequests);
+          const affordableRequests = autoFill(endpoint, remainingRequests);
           endpoint.pendingTokenBlocks = affordableRequests.map((request) => ({
             id: request.id,
             demand: request.tokenDemand,
@@ -127,8 +127,8 @@ export function multiplexedChat(endpoints: ChatEndpoint[]) {
   return chat;
 }
 
-function optimalFill(endpoint: ChatEndpoint, requests: ChatRequest[]) {
-  const pickedIndices = solvePackingProblem(
+function autoFill(endpoint: ChatEndpoint, requests: ChatRequest[]) {
+  const pickedIndices = dfsPack(
     endpoint.tokenLimit,
     requests.map((request) => request.tokenDemand)
   );

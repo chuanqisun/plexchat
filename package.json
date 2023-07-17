@@ -4,7 +4,7 @@
   "description": "Delightful concurrency for JavaScript",
   "main": "index.js",
   "scripts": {
-    "test": "tsx ./src/tests/store.test.ts"
+    "test": "tsx ./src/tests/index.test.ts"
   },
   "keywords": [],
   "author": "",

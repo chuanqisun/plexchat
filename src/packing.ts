@@ -3,7 +3,7 @@ type Bag = {
   itemIndices: number[];
 };
 
-export function solvePackingProblem(bagSize: number, items: number[]): number[] {
+export function dfsPack(bagSize: number, items: number[]): number[] {
   let currentBag: Bag = { sum: 0, itemIndices: [] };
   let bestBag: Bag = { sum: 0, itemIndices: [] };
 
@@ -26,4 +26,18 @@ function dfs(items: number[], bagSize: number, index: number, currentBag: Bag, b
 
     dfs(items, bagSize, index + 1, currentBag, bestBag);
   }
+}
+
+export function greedyPack(bagSize: number, items: number[]): number[] {
+  const sortedItemsWithOriginalIndex = [...items].map((size, index) => ({ size, index })).sort((a, b) => b.size - a.size);
+  let currentBag: Bag = { sum: 0, itemIndices: [] };
+
+  for (let i = 0; i < sortedItemsWithOriginalIndex.length; i++) {
+    if (currentBag.sum + sortedItemsWithOriginalIndex[i].size <= bagSize) {
+      currentBag.sum += sortedItemsWithOriginalIndex[i].size;
+      currentBag.itemIndices.push(sortedItemsWithOriginalIndex[i].index);
+    }
+  }
+
+  return currentBag.itemIndices.sort();
 }
