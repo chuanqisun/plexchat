@@ -1,136 +1,76 @@
-import { dfsPack } from "./packing";
 import { createStore } from "./store";
 
-interface SchedulerState {
-  requests: ChatRequest[];
-  endpoints: ChatEndpoint[];
+export interface SchedulerState<TaskType = any, WorkerType = any> {
+  tasks: TaskType[];
+  workers: WorkerType[];
+}
+export type RunFn<TaskType = any, WorkerType = any> = (
+  assignment: Assignment<TaskType, WorkerType>,
+  state: SchedulerState<TaskType, WorkerType>,
+  update: StateUpdateFn<TaskType, WorkerType>
+) => SchedulerState<TaskType, WorkerType>;
+export type StateUpdateFn<TaskType = any, WorkerType = any> = (
+  fn: (prev: SchedulerState<TaskType, WorkerType>) => SchedulerState<TaskType, WorkerType>
+) => void;
+
+export type ScheduleFn<TaskType = any, WorkerType = any> = (state: SchedulerState<TaskType, WorkerType>) => ScheduleOutput<TaskType, WorkerType>;
+
+export interface ScheduleOutput<TaskType = any, WorkerType = any> {
+  assignments: Assignment<TaskType, WorkerType>[];
+  state: SchedulerState<TaskType, WorkerType>;
 }
 
-interface ChatRequest {
-  id: number;
-  message: string;
-  tokenDemand: number;
-  callback: (result: string) => void;
-}
-interface ChatEndpoint {
-  request: (message: string) => Promise<string>;
-  tokenLimit: number;
-  pendingTokenBlocks: {
-    id: number;
-    demand: number;
-  }[];
+export interface Assignment<TaskType = any, WorkerType = any> {
+  task: TaskType;
+  worker: WorkerType;
 }
 
-const chat = multiplexedChat([
-  {
-    request: async (message) => {
-      return new Promise((resolve, reject) => {
-        const box = { resolve, reject };
-        const method = Math.random() > 0.5 ? "resolve" : "reject";
-        setTimeout(() => box[method](`worker 1: ${method} response to ${message}`), Math.random() * 2000);
-      });
-    },
-    tokenLimit: 4000,
-    pendingTokenBlocks: [],
-  },
-  {
-    request: async (message) => {
-      return new Promise((resolve, reject) => {
-        const box = { resolve, reject };
-        const method = Math.random() > 0.5 ? "resolve" : "reject";
-        setTimeout(() => box[method](`worker 2: ${method} response to ${message}`), Math.random() * 2000);
-      });
-    },
-    tokenLimit: 6000,
-    pendingTokenBlocks: [],
-  },
-]);
+export interface TaskManager<TaskType, WorkerType> {
+  addTask: (...task: TaskType[]) => void;
+  addWorker: (...worker: WorkerType[]) => void;
+}
 
-chat("Hello", 3000).then(console.log);
-chat("Hello 2", 4000).then(console.log);
-chat("Hello 3", 2000).then(console.log);
-chat("Hello 4", 5000).then(console.log);
-chat("Hello 5", 1000).then(console.log);
-
-export function multiplexedChat(endpoints: ChatEndpoint[]) {
-  const store = createStore<SchedulerState>([
+export function createTaskManager<TaskType, WorkerType>(
+  scheduleFn: ScheduleFn<TaskType, WorkerType>,
+  runFn: RunFn<TaskType, WorkerType>,
+  initialState?: SchedulerState<TaskType, WorkerType>
+): TaskManager<TaskType, WorkerType> {
+  const store = createStore<SchedulerState<TaskType, WorkerType>>([
     {
       onInit: () => ({
-        requests: [],
-        endpoints,
+        tasks: [],
+        workers: [],
+        ...initialState,
       }),
     },
     {
       onTransformChange: ({ current, update }) => {
-        let remainingRequests = [...current.requests];
-        const assignments: { chat: ChatRequest; endpoint: ChatEndpoint }[] = [];
+        const { state, assignments } = scheduleFn(current);
+        const newState = assignments.reduce((state, assignment) => {
+          return runFn(assignment, state, update);
+        }, state);
 
-        current.endpoints.forEach((endpoint) => {
-          if (!remainingRequests.length) return;
-
-          const affordableRequests = autoFill(endpoint, remainingRequests);
-          endpoint.pendingTokenBlocks = affordableRequests.map((request) => ({
-            id: request.id,
-            demand: request.tokenDemand,
-          }));
-          remainingRequests = remainingRequests.filter((request) => !affordableRequests.includes(request));
-          assignments.push(...affordableRequests.map((request) => ({ chat: request, endpoint })));
-        });
-
-        current.requests = remainingRequests;
-
-        // run all assignments
-        assignments.forEach(({ chat, endpoint }) => {
-          endpoint.request(chat.message).then(
-            (result) => {
-              update((prev) => {
-                const endpointIndex = prev.endpoints.indexOf(endpoint);
-                prev.endpoints[endpointIndex].pendingTokenBlocks = prev.endpoints[endpointIndex].pendingTokenBlocks.filter((block) => block.id !== chat.id);
-                return prev;
-              });
-              chat.callback(result);
-            },
-            () => {
-              update((prev) => {
-                const endpointIndex = prev.endpoints.indexOf(endpoint);
-                prev.endpoints[endpointIndex].pendingTokenBlocks = prev.endpoints[endpointIndex].pendingTokenBlocks.filter((block) => block.id !== chat.id);
-                prev.requests.push(chat);
-                return prev;
-              });
-            }
-          );
-        });
-
-        return current;
+        return newState;
       },
     },
   ]);
 
-  let currentId = 0;
-
-  async function chat(message: string, tokenDemand: number) {
-    return new Promise((resolve) => {
-      store.update((prev) => {
-        prev.requests.push({
-          id: ++currentId,
-          message,
-          tokenDemand,
-          callback: (result) => {
-            resolve(result);
-          },
-        });
-        return prev;
-      });
+  const addTask = (...task: TaskType[]) => {
+    store.update((prev) => {
+      prev.tasks.push(...task);
+      return prev;
     });
-  }
+  };
 
-  return chat;
-}
+  const addWorker = (...worker: WorkerType[]) => {
+    store.update((prev) => {
+      prev.workers.push(...worker);
+      return prev;
+    });
+  };
 
-function autoFill(endpoint: ChatEndpoint, requests: ChatRequest[]) {
-  const pickedIndices = dfsPack(
-    endpoint.tokenLimit,
-    requests.map((request) => request.tokenDemand)
-  );
-  return pickedIndices.map((index) => requests[index]);
+  return {
+    addTask,
+    addWorker,
+  };
 }
