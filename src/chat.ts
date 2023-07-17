@@ -42,7 +42,7 @@ interface ChatConfig {
   getDemand: (input: string[]) => number;
 }
 
-function createChat({ workers, getDemand: estimateDemand }: ChatConfig) {
+function createChat({ workers, getDemand }: ChatConfig) {
   let currentJobId = 0;
   const taskManager = createTaskManager<ChatTask, ChatWorker>(getChatScheduler(), getChatRunner());
   taskManager.addWorker(...workers);
@@ -52,7 +52,7 @@ function createChat({ workers, getDemand: estimateDemand }: ChatConfig) {
       taskManager.addTask({
         id: ++currentJobId,
         input,
-        demand: estimateDemand(input),
+        demand: getDemand(input),
         callback: resolve,
       });
     });
