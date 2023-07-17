@@ -4,20 +4,29 @@ export interface SchedulerState<TaskType = any, WorkerType = any> {
   tasks: TaskType[];
   workers: WorkerType[];
 }
-export type RunFn<TaskType = any, WorkerType = any> = (
-  assignment: Assignment<TaskType, WorkerType>,
-  state: SchedulerState<TaskType, WorkerType>,
-  update: StateUpdateFn<TaskType, WorkerType>
-) => SchedulerState<TaskType, WorkerType>;
+export type RunFn<TaskType = any, WorkerType = any> = (input: RunFnInput<TaskType, WorkerType>) => RunFnOutput<TaskType, WorkerType>;
+export type ScheduleFn<TaskType = any, WorkerType = any> = (input: ScheduleFnInput<TaskType, WorkerType>) => ScheduleFnOutput<TaskType, WorkerType>;
+
+export interface RunFnInput<TaskType = any, WorkerType = any> {
+  assignment: Assignment<TaskType, WorkerType>;
+  state: SchedulerState<TaskType, WorkerType>;
+  update: StateUpdateFn<TaskType, WorkerType>;
+}
+
+export interface RunFnOutput<TaskType = any, WorkerType = any> {
+  state: SchedulerState<TaskType, WorkerType>;
+}
+
 export type StateUpdateFn<TaskType = any, WorkerType = any> = (
   fn: (prev: SchedulerState<TaskType, WorkerType>) => SchedulerState<TaskType, WorkerType>
 ) => void;
 
-export type ScheduleFn<TaskType = any, WorkerType = any> = (state: SchedulerState<TaskType, WorkerType>) => ScheduleOutput<TaskType, WorkerType>;
-
-export interface ScheduleOutput<TaskType = any, WorkerType = any> {
-  assignments: Assignment<TaskType, WorkerType>[];
+export interface ScheduleFnInput<TaskType = any, WorkerType = any> {
   state: SchedulerState<TaskType, WorkerType>;
+}
+
+export interface ScheduleFnOutput<TaskType = any, WorkerType = any> {
+  assignments: Assignment<TaskType, WorkerType>[];
 }
 
 export interface Assignment<TaskType = any, WorkerType = any> {
@@ -45,10 +54,10 @@ export function createTaskManager<TaskType, WorkerType>(
     },
     {
       onTransformChange: ({ current, update }) => {
-        const { state, assignments } = scheduleFn(current);
+        const { assignments } = scheduleFn({ state: current });
         const newState = assignments.reduce((state, assignment) => {
-          return runFn(assignment, state, update);
-        }, state);
+          return runFn({ assignment, state, update }).state;
+        }, current);
 
         return newState;
       },
