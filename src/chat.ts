@@ -1,119 +1,124 @@
 import { dfsPack } from "./packing";
 import { Assignment, RunFn, ScheduleFn, SchedulerState, createTaskManager } from "./scheduler";
+import { ChatInput, ChatOutput } from "./types";
 
-const chat = createChat({
-  getDemand: (input) => input?.[0].length * 1000,
-  workers: [
-    {
-      id: 1,
-      run: async (message) => {
-        return new Promise((resolve, reject) => {
-          const box = { resolve, reject };
-          const method = Math.random() > 0.5 ? "resolve" : "reject";
-          setTimeout(() => box[method](`worker 1: ${method} response to ${message.join()}`), Math.random() * 2000);
-        });
-      },
-      capacity: 3000,
-      pendingTasks: [],
-    },
-    {
-      id: 2,
-      run: async (message) => {
-        return new Promise((resolve, reject) => {
-          const box = { resolve, reject };
-          const method = Math.random() > 0.5 ? "resolve" : "reject";
-          setTimeout(() => box[method](`worker 2: ${method} response to ${message.join()}`), Math.random() * 2000);
-        });
-      },
-      capacity: 6000,
-      pendingTasks: [],
-    },
-  ],
-});
-
-chat(["xxx"]).then(console.log);
-chat(["xxxxx"]).then(console.log);
-chat(["xx"]).then(console.log);
-chat(["xxxx"]).then(console.log);
-chat(["xxxxxx"]).then(console.log);
-
-interface ChatConfig {
-  workers: ChatWorker[];
-  getDemand: (input: string[]) => number;
+export function simpleChat(workerChat: WorkerChat, models: string[], input: SimpleChatInput): Promise<ChatOutput> {
+  const fullInput = getInput(input);
+  const fullDemand = getDemand(models, fullInput);
+  return workerChat(fullInput, fullDemand);
 }
 
-function createChat({ workers, getDemand }: ChatConfig) {
+export interface WorkerChatConfig {
+  workers: ChatWorker[];
+  onNextTick?: (task: () => any) => void;
+}
+
+export type WorkerChat = (input: ChatInput, demand: ChatTaskDemand) => Promise<ChatOutput>;
+
+export function createWorkerChat({ workers }: WorkerChatConfig): WorkerChat {
   let currentJobId = 0;
-  const taskManager = createTaskManager<ChatTask, ChatWorker>(getChatScheduler(), getChatRunner());
+  let isTicking = false;
+  const taskManager = createTaskManager<ChatTask, ChatWorker>(getChatScheduler(), getChatRunner({ demandExpireAfterMs: 65_000 }));
   taskManager.addWorker(...workers);
 
-  async function chat(input: string[]) {
-    return new Promise<string>((resolve) => {
+  const startClock = () => {
+    if (isTicking) return;
+    isTicking = true;
+    setTimeout(gc);
+  };
+
+  function gc() {
+    const now = Date.now();
+
+    taskManager.update((prev) => ({
+      ...prev,
+      workers: removeWorkerExpiredTasks(prev.workers, now),
+    }));
+
+    console.log(
+      taskManager
+        .getWorkers()
+        .map((w) => `${w.id}: ${w.historyTasks.length}`)
+        .join(" | ")
+    );
+
+    if (taskManager.getTasks().length) {
+      setTimeout(gc);
+    } else {
+      isTicking = false;
+    }
+  }
+
+  const chat: WorkerChat = async (input: ChatInput, demand: ChatTaskDemand) => {
+    startClock();
+    return new Promise<ChatOutput>((resolve) => {
       taskManager.addTask({
         id: ++currentJobId,
         input,
-        demand: getDemand(input),
+        demand,
         callback: resolve,
       });
     });
-  }
+  };
 
   return chat;
 }
 
+export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages">;
+export function getInput(input: SimpleChatInput): ChatInput {
+  return {
+    temperature: 0,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0,
+    max_tokens: 60,
+    stop: "",
+    ...input,
+  };
+}
+
+export type DemandChatInput = Partial<ChatInput> & Pick<ChatInput, "messages" | "max_tokens">;
+export function getDemand(models: string[], input: DemandChatInput): ChatTaskDemand {
+  return {
+    acceptModels: models,
+    outputTokens: input.max_tokens,
+    inputTokens: input.messages.flatMap((msg) => msg.content.split(" ")).length,
+  };
+}
+
 export interface ChatTask {
   id: number;
-  input: string[];
-  demand: number;
-  callback: (output: string) => void;
+  input: ChatInput;
+  demand: ChatTaskDemand;
+  callback: (output: ChatOutput) => void;
 }
 export interface ChatWorker {
   id: number;
-  run: (input: string[]) => Promise<string>;
-  capacity: number;
-  pendingTasks: {
+  run: (input: ChatInput) => Promise<ChatOutput>;
+  spec: ChatWorkerSpec;
+  historyTasks: {
     id: number;
-    demand: number;
+    expireAt: number;
+    demand: ChatTaskDemand;
   }[];
 }
 
-export function getChatRunner(): RunFn<ChatTask, ChatWorker> {
-  return ({ assignment, state, update }) => {
-    const { task, worker } = assignment;
-    worker.run(task.input).then(
-      (result) => {
-        // on success, remove task from worker
-        update((prev) => ({
-          ...prev,
-          workers: removeWorkerTask(prev.workers, worker.id, task.id),
-        }));
-        task.callback(result);
-      },
-      () => {
-        // on error, move task back to queue
-        update((prev) => ({
-          ...prev,
-          tasks: addTaskToQueue(prev.tasks, task),
-          workers: removeWorkerTask(prev.workers, worker.id, task.id),
-        }));
-      }
-    );
+export interface ChatWorkerSpec {
+  models: string[];
+  tokensPerMinute: number;
+}
 
-    // update worker and tasks based on assignment
-    const updatedState: SchedulerState<ChatTask, ChatWorker> = {
-      workers: addTaskToWorker(state.workers, worker.id, task),
-      tasks: removeTaskFromQueue(state.tasks, task.id),
-    };
-
-    return { state: updatedState };
-  };
+export interface ChatTaskDemand {
+  acceptModels: string[];
+  outputTokens: number;
+  inputTokens: number;
 }
 
 export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
   return ({ state }) => {
     const { tasks, workers } = state;
     const mutableWorkers = workers.map((w) => ({
-      pendingDemands: w.pendingTasks.map((t) => t.demand),
+      historyDemands: w.historyTasks.map((t) => t.demand),
       original: w,
     }));
     let mutableTasks = [...tasks];
@@ -126,7 +131,7 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
       const affordableTasks = dfsSelectTaskIndices(mutableWorker.original, mutableTasks).map((index) => mutableTasks[index]);
       if (!affordableTasks.length) continue; // next worker when no affordable task
 
-      mutableWorker.pendingDemands.push(...affordableTasks.map((task) => task.demand));
+      mutableWorker.historyDemands.push(...affordableTasks.map((task) => task.demand));
       mutableTasks = mutableTasks.filter((task) => !affordableTasks.includes(task));
       assignments.push(...affordableTasks.map((task) => ({ task, worker: mutableWorker.original })));
     }
@@ -137,22 +142,36 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
   };
 }
 
-function addTaskToWorker(workers: ChatWorker[], workerId: number, task: ChatTask): ChatWorker[] {
-  return workers.map((w) => {
-    if (w.id !== workerId) return w;
-    return {
-      ...w,
-      pendingTasks: [...w.pendingTasks, { id: task.id, demand: task.demand }],
+export interface ChatRunnerConfig {
+  demandExpireAfterMs: number;
+}
+export function getChatRunner(config: ChatRunnerConfig): RunFn<ChatTask, ChatWorker> {
+  return ({ assignment, state, update }) => {
+    const { task, worker } = assignment;
+    worker.run(task.input).then(task.callback, () => {
+      // on error, requeue the task
+      update((prev) => ({
+        ...prev,
+        tasks: addTaskToQueue(prev.tasks, task),
+      }));
+    });
+
+    // update worker and tasks based on assignment
+    const updatedState: SchedulerState<ChatTask, ChatWorker> = {
+      workers: addTaskToWorker(state.workers, worker.id, task, Date.now() + config.demandExpireAfterMs),
+      tasks: removeTaskFromQueue(state.tasks, task.id),
     };
-  });
+
+    return { state: updatedState };
+  };
 }
 
-function removeWorkerTask(workers: ChatWorker[], workerId: number, taskId: number): ChatWorker[] {
+function addTaskToWorker(workers: ChatWorker[], workerId: number, task: ChatTask, expireAt: number): ChatWorker[] {
   return workers.map((w) => {
     if (w.id !== workerId) return w;
     return {
       ...w,
-      pendingTasks: w.pendingTasks.filter((block) => block.id !== taskId),
+      historyTasks: [...w.historyTasks, { id: task.id, demand: task.demand, expireAt }],
     };
   });
 }
@@ -165,16 +184,19 @@ function removeTaskFromQueue(queue: ChatTask[], taskId: number): ChatTask[] {
   return queue.filter((t) => t.id !== taskId);
 }
 
-interface CapaticyWorker {
-  capacity: number;
+function removeWorkerExpiredTasks(workers: ChatWorker[], now: number): ChatWorker[] {
+  return workers.map((w) => ({
+    ...w,
+    historyTasks: w.historyTasks.filter((t) => t.expireAt > now),
+  }));
 }
-interface DemandTask {
-  demand: number;
-}
-function dfsSelectTaskIndices<TaskType extends DemandTask, WorkerType extends CapaticyWorker>(worker: WorkerType, tasks: TaskType[]) {
+
+function dfsSelectTaskIndices(worker: ChatWorker, tasks: ChatTask[]) {
+  const capacity = worker.spec.tokensPerMinute - worker.historyTasks.reduce((acc, task) => acc + task.demand.inputTokens, 0);
+
   const pickedIndices = dfsPack(
-    worker.capacity,
-    tasks.map((task) => task.demand)
+    capacity,
+    tasks.map((task) => task.demand.inputTokens + task.demand.outputTokens)
   );
 
   return pickedIndices;

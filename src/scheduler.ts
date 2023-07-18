@@ -37,6 +37,9 @@ export interface Assignment<TaskType = any, WorkerType = any> {
 export interface TaskManager<TaskType, WorkerType> {
   addTask: (...task: TaskType[]) => void;
   addWorker: (...worker: WorkerType[]) => void;
+  update: (fn: (prev: SchedulerState<TaskType, WorkerType>) => SchedulerState<TaskType, WorkerType>) => void;
+  getTasks: () => TaskType[];
+  getWorkers: () => WorkerType[];
 }
 
 export function createTaskManager<TaskType, WorkerType>(
@@ -78,8 +81,14 @@ export function createTaskManager<TaskType, WorkerType>(
     });
   };
 
+  const getTasks = () => store.getState().tasks;
+  const getWorkers = () => store.getState().workers;
+
   return {
     addTask,
     addWorker,
+    update: store.update,
+    getTasks,
+    getWorkers,
   };
 }
