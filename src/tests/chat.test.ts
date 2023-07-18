@@ -1,14 +1,16 @@
-import { createWorkerChat, simpleChat } from "../chat";
+import { createLoopChat, simpleChat } from "../chat";
 import { ChatInput, ChatOutput } from "../types";
 
-const chat = createWorkerChat({
+const chat = createLoopChat({
+  verbose: true,
   workers: [
     {
       id: 1,
       run: async (input) => mockChatApi("worker 1", input),
       spec: {
         models: ["model1", "model2"],
-        tokensPerMinute: 2,
+        tokenLimit: 2,
+        tokenLimitWindowSize: 5000,
       },
       historyTasks: [],
     },
@@ -17,7 +19,8 @@ const chat = createWorkerChat({
       run: async (input) => mockChatApi("worker 2", input),
       spec: {
         models: ["model1", "model2"],
-        tokensPerMinute: 3,
+        tokenLimit: 3,
+        tokenLimitWindowSize: 5000,
       },
       historyTasks: [],
     },

@@ -2,23 +2,66 @@ import { dfsPack } from "./packing";
 import { Assignment, RunFn, ScheduleFn, SchedulerState, createTaskManager } from "./scheduler";
 import { ChatInput, ChatOutput } from "./types";
 
-export function simpleChat(workerChat: WorkerChat, models: string[], input: SimpleChatInput): Promise<ChatOutput> {
+export function simpleChat(workerChat: LoopChat, models: string[], input: SimpleChatInput): Promise<ChatOutput> {
   const fullInput = getInput(input);
   const fullDemand = getDemand(models, fullInput);
   return workerChat(fullInput, fullDemand);
 }
 
+export interface AzureOpenAIChatWorkerConfig {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  tokensPerMinute: number;
+}
+export function azureOpenAIChatWorker(config: AzureOpenAIChatWorkerConfig): ChatWorker {
+  let currentId = 0;
+  const { endpoint, apiKey, model, tokensPerMinute } = config;
+  const run = async (input) => {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify({
+        ...input,
+        model,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Azure OpenAI Chat API error: ${response.status} ${response.statusText}`);
+    }
+    const result = await response.json();
+    return result as ChatOutput;
+  };
+
+  return {
+    id: ++currentId,
+    run,
+    spec: {
+      models: [model],
+      tokenLimit: tokensPerMinute,
+      tokenLimitWindowSize: 65_000, // 5 seconds additonal buffer
+    },
+    historyTasks: [],
+  };
+}
+
 export interface WorkerChatConfig {
   workers: ChatWorker[];
+  maxRetry?: number;
+  verbose?: boolean;
   onNextTick?: (task: () => any) => void;
 }
 
-export type WorkerChat = (input: ChatInput, demand: ChatTaskDemand) => Promise<ChatOutput>;
+export type LoopChat = (input: ChatInput, demand: ChatTaskDemand) => Promise<ChatOutput>;
 
-export function createWorkerChat({ workers }: WorkerChatConfig): WorkerChat {
+export function createLoopChat(config: WorkerChatConfig): LoopChat {
+  const { workers, verbose = false, maxRetry = 3 } = config;
   let currentJobId = 0;
   let isTicking = false;
-  const taskManager = createTaskManager<ChatTask, ChatWorker>(getChatScheduler(), getChatRunner({ demandExpireAfterMs: 65_000 }));
+  const taskManager = createTaskManager<ChatTask, ChatWorker>(getChatScheduler(), getChatRunner());
   taskManager.addWorker(...workers);
 
   const startClock = () => {
@@ -35,12 +78,14 @@ export function createWorkerChat({ workers }: WorkerChatConfig): WorkerChat {
       workers: removeWorkerExpiredTasks(prev.workers, now),
     }));
 
-    console.log(
-      taskManager
-        .getWorkers()
-        .map((w) => `${w.id}: ${w.historyTasks.length}`)
-        .join(" | ")
-    );
+    if (verbose) {
+      console.log(
+        taskManager
+          .getWorkers()
+          .map((w) => `${w.id}: ${w.historyTasks.length}`)
+          .join(" | ")
+      );
+    }
 
     if (taskManager.getTasks().length) {
       setTimeout(gc);
@@ -49,14 +94,16 @@ export function createWorkerChat({ workers }: WorkerChatConfig): WorkerChat {
     }
   }
 
-  const chat: WorkerChat = async (input: ChatInput, demand: ChatTaskDemand) => {
+  const chat: LoopChat = async (input: ChatInput, demand: ChatTaskDemand) => {
     startClock();
-    return new Promise<ChatOutput>((resolve) => {
+    return new Promise<ChatOutput>((resolve, reject) => {
       taskManager.addTask({
         id: ++currentJobId,
         input,
         demand,
-        callback: resolve,
+        retryLeft: maxRetry,
+        onSuccess: resolve,
+        onError: reject,
       });
     });
   };
@@ -90,7 +137,9 @@ export interface ChatTask {
   id: number;
   input: ChatInput;
   demand: ChatTaskDemand;
-  callback: (output: ChatOutput) => void;
+  retryLeft: number;
+  onSuccess: (output: ChatOutput) => void;
+  onError: (error: any) => void;
 }
 export interface ChatWorker {
   id: number;
@@ -105,7 +154,9 @@ export interface ChatWorker {
 
 export interface ChatWorkerSpec {
   models: string[];
-  tokensPerMinute: number;
+  tokenLimit: number;
+  tokenLimitWindowSize: number;
+  // tokensPerMinute: number;
 }
 
 export interface ChatTaskDemand {
@@ -142,23 +193,25 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
   };
 }
 
-export interface ChatRunnerConfig {
-  demandExpireAfterMs: number;
-}
-export function getChatRunner(config: ChatRunnerConfig): RunFn<ChatTask, ChatWorker> {
+export function getChatRunner(): RunFn<ChatTask, ChatWorker> {
   return ({ assignment, state, update }) => {
     const { task, worker } = assignment;
-    worker.run(task.input).then(task.callback, () => {
+    worker.run(task.input).then(task.onSuccess, (err) => {
       // on error, requeue the task
-      update((prev) => ({
-        ...prev,
-        tasks: addTaskToQueue(prev.tasks, task),
-      }));
+      console.log("requeued on error", err);
+      if (task.retryLeft <= 0) {
+        task.onError(err);
+      } else {
+        update((prev) => ({
+          ...prev,
+          tasks: addTaskToQueue(prev.tasks, { ...task, retryLeft: task.retryLeft - 1 }),
+        }));
+      }
     });
 
     // update worker and tasks based on assignment
     const updatedState: SchedulerState<ChatTask, ChatWorker> = {
-      workers: addTaskToWorker(state.workers, worker.id, task, Date.now() + config.demandExpireAfterMs),
+      workers: addTaskToWorker(state.workers, worker.id, task, Date.now() + worker.spec.tokenLimitWindowSize),
       tasks: removeTaskFromQueue(state.tasks, task.id),
     };
 
@@ -192,7 +245,7 @@ function removeWorkerExpiredTasks(workers: ChatWorker[], now: number): ChatWorke
 }
 
 function dfsSelectTaskIndices(worker: ChatWorker, tasks: ChatTask[]) {
-  const capacity = worker.spec.tokensPerMinute - worker.historyTasks.reduce((acc, task) => acc + task.demand.inputTokens, 0);
+  const capacity = worker.spec.tokenLimit - worker.historyTasks.reduce((acc, task) => acc + task.demand.inputTokens + task.demand.outputTokens, 0);
 
   const pickedIndices = dfsPack(
     capacity,
