@@ -1,4 +1,4 @@
-import { dfsPack } from "../scheduler/packing";
+import { fifoPack } from "../scheduler/packing";
 import { createTaskManager, type Assignment, type RunFn, type ScheduleFn, type SchedulerState } from "../scheduler/scheduler";
 import type { ChatInput, ChatOutput, ModelName } from "./types";
 
@@ -123,9 +123,11 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
     for (const mutableWorker of mutableWorkers) {
       if (!mutableTasks.length) break; // stop when no task left
 
+      const availableParallelism = mutableWorker.original.spec.parallelism - mutableWorker.historyDemands.length;
+
       const affordableTasks = dfsSelectTaskIndices(mutableWorker.original, mutableTasks).map((index) => mutableTasks[index]);
 
-      const parallelControlledTasks = affordableTasks.slice(0, mutableWorker.original.spec.parallelism);
+      const parallelControlledTasks = affordableTasks.slice(0, availableParallelism);
       if (!parallelControlledTasks.length) continue; // next worker when no affordable task
 
       mutableWorker.historyDemands.push(...parallelControlledTasks.map((task) => task.demand));
@@ -194,7 +196,7 @@ function removeWorkerExpiredTasks(workers: ChatWorker[], now: number): ChatWorke
 function dfsSelectTaskIndices(worker: ChatWorker, tasks: ChatTask[]) {
   const capacity = worker.spec.tokenLimit - worker.historyTasks.reduce((acc, task) => acc + task.demand.totalTokens, 0);
 
-  const pickedIndices = dfsPack(
+  const pickedIndices = fifoPack(
     capacity,
     tasks.map((task) => task.demand.totalTokens)
   );
