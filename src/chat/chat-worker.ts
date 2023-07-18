@@ -1,7 +1,8 @@
 import type { ChatWorker, OpenAIJsonProxy } from "./chat";
+import type { ModelName } from "./types";
 
 export interface AzureOpenAIChatWorkerConfig {
-  model: string;
+  model: ModelName;
   tokenLimit: number;
   tokenLimitWindowSize: number;
   proxy: OpenAIJsonProxy;

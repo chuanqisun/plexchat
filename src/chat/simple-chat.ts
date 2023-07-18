@@ -9,7 +9,7 @@ export interface SimpleChatModelConfig extends Partial<Exclude<ChatInput, "messa
 
 export interface SimpleChatConfig {
   chatTaskRunner: ChatTaskRunner;
-  getTokenCount: (input: string) => number;
+  getTokenCount: (messages: ChatMessage[]) => number;
 }
 
 export function getSimpleRESTChat(config: SimpleChatConfig) {
@@ -29,7 +29,7 @@ export function getSimpleRESTChat(config: SimpleChatConfig) {
         },
         retryLeft: modelConfig?.retry ?? 3,
         demand: {
-          totalTokens: maxTokens + config.getTokenCount(messages.map((msg) => msg.content).join("\n")),
+          totalTokens: maxTokens + config.getTokenCount(messages),
           models: modelConfig?.models ?? ["gpt-35-turbo", "gpt-35-turbo-16k", "gpt-4", "gpt-4-32k"],
         },
         onSuccess: (chatOutput) => resolve(chatOutput.choices[0].message?.content ?? ""),

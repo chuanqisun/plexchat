@@ -3,7 +3,7 @@ import { getChatTaskRunner } from "./chat";
 import { azureOpenAIChatWorker } from "./chat-worker";
 import { getSimpleRESTChat } from "./simple-chat";
 
-const runChatTask = getChatTaskRunner({
+const chatTaskRunner = getChatTaskRunner({
   verbose: true,
   workers: [
     azureOpenAIChatWorker({
@@ -19,8 +19,8 @@ const runChatTask = getChatTaskRunner({
 });
 
 const chat = getSimpleRESTChat({
-  chatTaskRunner: runChatTask,
-  getTokenCount: (input) => input.split(" ").length * 1.5,
+  chatTaskRunner,
+  getTokenCount: (input) => input.flatMap((msg) => msg.content.split(" ")).length * 1.5,
 });
 
 chat(
