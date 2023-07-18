@@ -1,5 +1,6 @@
-import { azureOpenAIChatWorker, createChatEngine, getOpenAIJsonProxy } from "./chat";
+import { createChatEngine, getOpenAIJsonProxy } from "./chat";
 import { demoChat } from "./chat-demo";
+import { azureOpenAIChatWorker } from "./chat-worker";
 
 const chat = createChatEngine({
   verbose: true,
@@ -10,7 +11,8 @@ const chat = createChatEngine({
         apiKey: "",
       }),
       model: "gpt-35-turbo",
-      tokensPerMinute: 200,
+      tokenLimit: 200,
+      tokenLimitWindowSize: 60_000,
     }),
   ],
 });

@@ -2,29 +2,6 @@ import { dfsPack } from "../scheduler/packing";
 import { createTaskManager, type Assignment, type RunFn, type ScheduleFn, type SchedulerState } from "../scheduler/scheduler";
 import type { ChatInput, ChatOutput } from "./types";
 
-export interface AzureOpenAIChatWorkerConfig {
-  model: string;
-  tokensPerMinute: number;
-  proxy: OpenAIJsonProxy;
-}
-
-export type OpenAIJsonProxy = (input: ChatInput) => Promise<ChatOutput>;
-
-export function azureOpenAIChatWorker(config: AzureOpenAIChatWorkerConfig): ChatWorker {
-  const { model, tokensPerMinute, proxy } = config;
-
-  return {
-    id: crypto.randomUUID(),
-    proxy,
-    spec: {
-      models: [model],
-      tokenLimit: tokensPerMinute,
-      tokenLimitWindowSize: 65_000, // 5 seconds additonal buffer
-    },
-    historyTasks: [],
-  };
-}
-
 export interface WorkerChatConfig {
   workers: ChatWorker[];
   verbose?: boolean;
@@ -147,6 +124,7 @@ export interface ChatWorker {
     demand: ChatTaskDemand;
   }[];
 }
+export type OpenAIJsonProxy = (input: ChatInput) => Promise<ChatOutput>;
 
 export interface ChatWorkerSpec {
   models: string[];
