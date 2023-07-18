@@ -1,7 +1,7 @@
 {
   "name": "burstio",
   "version": "1.0.0",
-  "description": "Delightful concurrency for JavaScript",
+  "description": "High throughput Azure OpenAI Chat Client",
   "main": "index.js",
   "scripts": {
     "test": "tsx ./src/index.test.ts"

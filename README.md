@@ -1,3 +1,3 @@
 # burstio
 
-A task scheduling library for JavaScript
+High throughput Azure OpenAI Chat Client
