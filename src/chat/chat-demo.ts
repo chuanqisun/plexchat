@@ -1,22 +1,32 @@
-import { createChatEngine, getEstimatedDemand, getInput, type ChatEngine, type SimpleChatInput } from "./chat";
-import type { ChatInput, ChatOutput } from "./types";
+import { getChatTaskRunner, getEstimatedDemand, getInput, type ChatTask, type ChatTaskRunner, type SimpleChatInput } from "./chat";
+import type { ChatInput, ChatOutput, ModelName } from "./types";
 
-export function demoChat(chatEngine: ChatEngine, models: string[], input: SimpleChatInput): Promise<ChatOutput> {
-  const fullInput = getInput(input);
-  const fullDemand = getEstimatedDemand(models, fullInput);
-  return chatEngine(fullInput, fullDemand);
+export function demoChat(runChatTask: ChatTaskRunner, models: ModelName[], input: SimpleChatInput): Promise<ChatOutput> {
+  return new Promise((resolve, reject) => {
+    const fullInput = getInput(input);
+    const fullDemand = getEstimatedDemand(models, fullInput);
+    const chatTask: ChatTask = {
+      id: crypto.randomUUID(),
+      input: fullInput,
+      demand: fullDemand,
+      retryLeft: 99,
+      onSuccess: resolve,
+      onError: reject,
+    };
+    runChatTask(chatTask);
+  });
 }
 
-const chatEngine = createChatEngine({
+const chatEngine = getChatTaskRunner({
   verbose: true,
   workers: [
     {
       id: "1",
       proxy: async (input) => mockChatApi("worker 1", input),
       spec: {
-        models: ["model1", "model2"],
-        tokenLimit: 2,
-        tokenLimitWindowSize: 5000,
+        models: ["gpt-35-turbo", "gpt-4"],
+        tokenLimit: 5,
+        tokenLimitWindowSize: 1000,
       },
       historyTasks: [],
     },
@@ -24,9 +34,9 @@ const chatEngine = createChatEngine({
       id: "2",
       proxy: async (input) => mockChatApi("worker 2", input),
       spec: {
-        models: ["model1", "model2"],
-        tokenLimit: 3,
-        tokenLimitWindowSize: 5000,
+        models: ["gpt-35-turbo", "gpt-4"],
+        tokenLimit: 5,
+        tokenLimitWindowSize: 1000,
       },
       historyTasks: [],
     },
@@ -37,6 +47,7 @@ function mockChatApi(prefix: string, input: ChatInput): Promise<ChatOutput> {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (Math.random() > 0.5) {
+        console.log(`${prefix} will resolve`);
         resolve({
           choices: [
             {
@@ -60,7 +71,7 @@ function mockChatApi(prefix: string, input: ChatInput): Promise<ChatOutput> {
     }, 1000);
   });
 }
-demoChat(chatEngine, ["model1", "model2"], {
+demoChat(chatEngine, ["gpt-35-turbo", "gpt-4"], {
   messages: [
     {
       role: "user",
@@ -68,9 +79,11 @@ demoChat(chatEngine, ["model1", "model2"], {
     },
   ],
   max_tokens: 0,
-}).then(console.log);
+})
+  .then(() => console.log("task 1 resolved"))
+  .catch(() => console.log("task 1 error"));
 
-demoChat(chatEngine, ["model1", "model2"], {
+demoChat(chatEngine, ["gpt-35-turbo", "gpt-4"], {
   messages: [
     {
       role: "user",
@@ -78,8 +91,11 @@ demoChat(chatEngine, ["model1", "model2"], {
     },
   ],
   max_tokens: 0,
-}).then(console.log);
-demoChat(chatEngine, ["model1", "model2"], {
+})
+  .then(() => console.log("task 2 resolved"))
+  .catch(() => console.log("task 2 error"));
+
+demoChat(chatEngine, ["gpt-35-turbo", "gpt-4"], {
   messages: [
     {
       role: "user",
@@ -87,4 +103,6 @@ demoChat(chatEngine, ["model1", "model2"], {
     },
   ],
   max_tokens: 0,
-}).then(console.log);
+})
+  .then(() => console.log("task 3 resolved"))
+  .catch(() => console.log("task 3 error"));

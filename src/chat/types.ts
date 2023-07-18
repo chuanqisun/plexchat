@@ -40,3 +40,5 @@ export type ChatOutput = {
     total_tokens: number;
   };
 };
+
+export type ModelName = "gpt-35-turbo" | "gpt-35-turbo-16k" | "gpt-4" | "gpt-4-32k";
