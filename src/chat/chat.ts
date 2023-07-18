@@ -92,7 +92,8 @@ export interface ChatWorker {
   historyTasks: {
     id: string;
     expireAt: number;
-    demand: ChatTaskDemand;
+    tokenConsumed: number;
+    isRunning?: boolean;
   }[];
 }
 export type OpenAIJsonProxy = (input: ChatInput) => Promise<ChatOutput>;
@@ -113,7 +114,8 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
   return ({ state }) => {
     const { tasks, workers } = state;
     const mutableWorkers = workers.map((w) => ({
-      historyDemands: w.historyTasks.map((t) => t.demand),
+      historyDemands: w.historyTasks.map((t) => t.tokenConsumed),
+      runningTaskCount: w.historyTasks.filter((t) => t.isRunning).length,
       original: w,
     }));
     let mutableTasks = [...tasks];
@@ -123,14 +125,14 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
     for (const mutableWorker of mutableWorkers) {
       if (!mutableTasks.length) break; // stop when no task left
 
-      const availableParallelism = mutableWorker.original.spec.parallelism - mutableWorker.historyDemands.length;
+      const availableParallelism = mutableWorker.original.spec.parallelism - mutableWorker.runningTaskCount;
 
       const affordableTasks = selectTaskIndices(mutableWorker.original, mutableTasks).map((index) => mutableTasks[index]);
 
       const parallelControlledTasks = affordableTasks.slice(0, availableParallelism);
       if (!parallelControlledTasks.length) continue; // next worker when no affordable task
 
-      mutableWorker.historyDemands.push(...parallelControlledTasks.map((task) => task.demand));
+      mutableWorker.historyDemands.push(...parallelControlledTasks.map((task) => task.demand.totalTokens));
       mutableTasks = mutableTasks.filter((task) => !parallelControlledTasks.includes(task));
       assignments.push(...parallelControlledTasks.map((task) => ({ task, worker: mutableWorker.original })));
     }
@@ -144,23 +146,32 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
 export function getChatRunner(): RunFn<ChatTask, ChatWorker> {
   return ({ assignment, state, update }) => {
     const { task, worker } = assignment;
-    worker.proxy(task.input).then(task.onSuccess, (err) => {
-      // on error, requeue the task
-      if (task.retryLeft <= 0) {
-        console.log("no retry left", err);
-        task.onError(err);
-      } else {
-        console.log("requeued on error", err);
+    worker.proxy(task.input).then(
+      (result) => {
+        task.onSuccess(result);
         update((prev) => ({
           ...prev,
-          tasks: addTaskToQueue(prev.tasks, { ...task, retryLeft: task.retryLeft - 1 }),
+          workers: markRunningTaskAsStopped(prev.workers, worker.id, task.id),
         }));
+      },
+      (err) => {
+        // on error, requeue the task
+        if (task.retryLeft <= 0) {
+          console.log("no retry left", err);
+          task.onError(err);
+        } else {
+          console.log("requeued on error", err);
+          update((prev) => ({
+            ...prev,
+            tasks: addTaskToQueue(prev.tasks, { ...task, retryLeft: task.retryLeft - 1 }),
+          }));
+        }
       }
-    });
+    );
 
     // update worker and tasks based on assignment
     const updatedState: SchedulerState<ChatTask, ChatWorker> = {
-      workers: addTaskToWorker(state.workers, worker.id, task, Date.now() + worker.spec.tokenLimitWindowSize),
+      workers: addRunningTaskToWorker(state.workers, worker.id, task, Date.now() + worker.spec.tokenLimitWindowSize),
       tasks: removeTaskFromQueue(state.tasks, task.id),
     };
 
@@ -168,12 +179,28 @@ export function getChatRunner(): RunFn<ChatTask, ChatWorker> {
   };
 }
 
-function addTaskToWorker(workers: ChatWorker[], workerId: string, task: ChatTask, expireAt: number): ChatWorker[] {
+function addRunningTaskToWorker(workers: ChatWorker[], workerId: string, task: ChatTask, expireAt: number): ChatWorker[] {
   return workers.map((w) => {
     if (w.id !== workerId) return w;
     return {
       ...w,
-      historyTasks: [...w.historyTasks, { id: task.id, demand: task.demand, expireAt }],
+      historyTasks: [...w.historyTasks, { id: task.id, tokenConsumed: task.demand.totalTokens, expireAt, isRunning: true }],
+    };
+  });
+}
+
+function markRunningTaskAsStopped(workers: ChatWorker[], workerId: string, taskId: string): ChatWorker[] {
+  return workers.map((w) => {
+    if (w.id !== workerId) return w;
+    return {
+      ...w,
+      historyTasks: w.historyTasks.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          isRunning: false,
+        };
+      }),
     };
   });
 }
@@ -194,7 +221,7 @@ function removeWorkerExpiredTasks(workers: ChatWorker[], now: number): ChatWorke
 }
 
 function selectTaskIndices(worker: ChatWorker, tasks: ChatTask[]) {
-  const capacity = worker.spec.tokenLimit - worker.historyTasks.reduce((acc, task) => acc + task.demand.totalTokens, 0);
+  const capacity = worker.spec.tokenLimit - worker.historyTasks.reduce((acc, task) => acc + task.tokenConsumed, 0);
 
   const pickedIndices = fifoPack(
     capacity,
