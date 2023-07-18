@@ -5,8 +5,8 @@ const chat = createLoopChat({
   verbose: true,
   workers: [
     {
-      id: 1,
-      run: async (input) => mockChatApi("worker 1", input),
+      id: "1",
+      proxy: async (input) => mockChatApi("worker 1", input),
       spec: {
         models: ["model1", "model2"],
         tokenLimit: 2,
@@ -15,8 +15,8 @@ const chat = createLoopChat({
       historyTasks: [],
     },
     {
-      id: 2,
-      run: async (input) => mockChatApi("worker 2", input),
+      id: "2",
+      proxy: async (input) => mockChatApi("worker 2", input),
       spec: {
         models: ["model1", "model2"],
         tokenLimit: 3,

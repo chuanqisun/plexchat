@@ -1,11 +1,13 @@
-import { azureOpenAIChatWorker, createLoopChat, simpleChat } from "./chat";
+import { azureOpenAIChatWorker, createLoopChat, getOpenAIJsonProxy, simpleChat } from "./chat";
 
 const chat = createLoopChat({
   verbose: true,
   workers: [
     azureOpenAIChatWorker({
-      endpoint: "",
-      apiKey: "",
+      proxy: getOpenAIJsonProxy({
+        endpoint: "",
+        apiKey: "",
+      }),
       model: "gpt-35-turbo",
       tokensPerMinute: 200,
     }),

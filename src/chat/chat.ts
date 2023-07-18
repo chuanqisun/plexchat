@@ -9,36 +9,19 @@ export function simpleChat(workerChat: LoopChat, models: string[], input: Simple
 }
 
 export interface AzureOpenAIChatWorkerConfig {
-  endpoint: string;
-  apiKey: string;
   model: string;
   tokensPerMinute: number;
+  proxy: OpenAIJsonProxy;
 }
+
+export type OpenAIJsonProxy = (input: ChatInput) => Promise<ChatOutput>;
+
 export function azureOpenAIChatWorker(config: AzureOpenAIChatWorkerConfig): ChatWorker {
-  let currentId = 0;
-  const { endpoint, apiKey, model, tokensPerMinute } = config;
-  const run = async (input: ChatInput) => {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        ...input,
-        model,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`Azure OpenAI Chat API error: ${response.status} ${response.statusText}`);
-    }
-    const result = await response.json();
-    return result as ChatOutput;
-  };
+  const { model, tokensPerMinute, proxy } = config;
 
   return {
-    id: ++currentId,
-    run,
+    id: crypto.randomUUID(),
+    proxy,
     spec: {
       models: [model],
       tokenLimit: tokensPerMinute,
@@ -54,6 +37,28 @@ export interface WorkerChatConfig {
   verbose?: boolean;
   onNextTick?: (task: () => any) => void;
 }
+
+export interface ProxyConfig {
+  apiKey: string;
+  endpoint: string;
+}
+export const getOpenAIJsonProxy =
+  ({ apiKey, endpoint }: ProxyConfig) =>
+  async (input: ChatInput) => {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new Error(`Azure OpenAI Chat API error: ${response.status} ${response.statusText}`);
+    }
+    const result = await response.json();
+    return result as ChatOutput;
+  };
 
 export type LoopChat = (input: ChatInput, demand: ChatTaskDemand) => Promise<ChatOutput>;
 
@@ -98,7 +103,7 @@ export function createLoopChat(config: WorkerChatConfig): LoopChat {
     startClock();
     return new Promise<ChatOutput>((resolve, reject) => {
       taskManager.addTask({
-        id: ++currentJobId,
+        id: crypto.randomUUID(),
         input,
         demand,
         retryLeft: maxRetry,
@@ -134,7 +139,7 @@ export function getDemand(models: string[], input: DemandChatInput): ChatTaskDem
 }
 
 export interface ChatTask {
-  id: number;
+  id: string;
   input: ChatInput;
   demand: ChatTaskDemand;
   retryLeft: number;
@@ -142,11 +147,11 @@ export interface ChatTask {
   onError: (error: any) => void;
 }
 export interface ChatWorker {
-  id: number;
-  run: (input: ChatInput) => Promise<ChatOutput>;
+  id: string;
+  proxy: OpenAIJsonProxy;
   spec: ChatWorkerSpec;
   historyTasks: {
-    id: number;
+    id: string;
     expireAt: number;
     demand: ChatTaskDemand;
   }[];
@@ -196,7 +201,7 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
 export function getChatRunner(): RunFn<ChatTask, ChatWorker> {
   return ({ assignment, state, update }) => {
     const { task, worker } = assignment;
-    worker.run(task.input).then(task.onSuccess, (err) => {
+    worker.proxy(task.input).then(task.onSuccess, (err) => {
       // on error, requeue the task
       console.log("requeued on error", err);
       if (task.retryLeft <= 0) {
@@ -219,7 +224,7 @@ export function getChatRunner(): RunFn<ChatTask, ChatWorker> {
   };
 }
 
-function addTaskToWorker(workers: ChatWorker[], workerId: number, task: ChatTask, expireAt: number): ChatWorker[] {
+function addTaskToWorker(workers: ChatWorker[], workerId: string, task: ChatTask, expireAt: number): ChatWorker[] {
   return workers.map((w) => {
     if (w.id !== workerId) return w;
     return {
@@ -233,7 +238,7 @@ function addTaskToQueue(queue: ChatTask[], task: ChatTask): ChatTask[] {
   return [...queue.filter((t) => t.id !== task.id), task];
 }
 
-function removeTaskFromQueue(queue: ChatTask[], taskId: number): ChatTask[] {
+function removeTaskFromQueue(queue: ChatTask[], taskId: string): ChatTask[] {
   return queue.filter((t) => t.id !== taskId);
 }
 
