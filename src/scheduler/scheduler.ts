@@ -1,4 +1,4 @@
-import { createStore } from "./store";
+import { createStore } from "../store/store";
 
 export interface SchedulerState<TaskType = any, WorkerType = any> {
   tasks: TaskType[];

@@ -1,6 +1,6 @@
 import assert from "assert";
 import { describe, it } from "node:test";
-import { createStore } from "../store";
+import { createStore, type Plugin } from "../store";
 
 describe("createStore", () => {
   it("should throw an error if no plugin with onInit hook is provided", () => {
@@ -8,7 +8,7 @@ describe("createStore", () => {
   });
 
   it("should initialize state with the return value of the onInit hook", () => {
-    const plugin = {
+    const plugin: Plugin<any> = {
       onInit: ({ current }) => current || "init",
     };
     const store = createStore([plugin]);
@@ -16,7 +16,7 @@ describe("createStore", () => {
   });
 
   it("should update state with the return value of the onTransformChange hook", () => {
-    const plugin = {
+    const plugin: Plugin<any> = {
       onInit: ({ current }) => current || "init",
       onTransformChange: ({ current }) => current + " updated",
     };
@@ -27,7 +27,7 @@ describe("createStore", () => {
 
   it("should call onDidChange hook with the current and previous state after an update", () => {
     let onDidChangeCalled = false;
-    const plugin = {
+    const plugin: Plugin<any> = {
       onInit: ({ current }) => current || "init",
       onTransformChange: ({ current }) => current + " updated",
       onDidChange: ({ current, previous }) => {
@@ -42,7 +42,7 @@ describe("createStore", () => {
   });
 
   it("should abort the update if abort is called in onTransformChange hook", () => {
-    const plugin = {
+    const plugin: Plugin<any> = {
       onInit: ({ current }) => current || "init",
       onTransformChange: ({ current, abort }) => {
         abort();
@@ -56,7 +56,7 @@ describe("createStore", () => {
 
   it("should not call onDidChange if update is aborted", () => {
     let onDidChangeCalled = false;
-    const plugin = {
+    const plugin: Plugin<any> = {
       onInit: ({ current }) => current || "init",
       onTransformChange: ({ current, abort }) => {
         abort();
@@ -73,14 +73,14 @@ describe("createStore", () => {
 
   it("should call onTransformChange hooks in the order they are provided", () => {
     let firstHookCalled = false;
-    const plugin1 = {
+    const plugin1: Plugin<any> = {
       onInit: ({ current }) => current || "init",
       onTransformChange: ({ current }) => {
         firstHookCalled = true;
         return current + " updated";
       },
     };
-    const plugin2 = {
+    const plugin2: Plugin<any> = {
       onTransformChange: ({ current }) => {
         assert.strictEqual(firstHookCalled, true);
         return current + " again";
@@ -93,13 +93,13 @@ describe("createStore", () => {
 
   it("should call onInit hooks in the order they are provided", () => {
     let firstHookCalled = false;
-    const plugin1 = {
+    const plugin1: Plugin<any> = {
       onInit: ({ current }) => {
         firstHookCalled = true;
         return current || "init";
       },
     };
-    const plugin2 = {
+    const plugin2: Plugin<any> = {
       onInit: ({ current }) => {
         assert.strictEqual(firstHookCalled, true);
         return current + " updated";
@@ -111,7 +111,7 @@ describe("createStore", () => {
 
   it("should call onDidChange hooks even if state is updated to the same value", () => {
     let onDidChangeCalled = false;
-    const plugin = {
+    const plugin: Plugin<any> = {
       onInit: ({ current }) => current || "init",
       onTransformChange: ({ current }) => "init",
       onDidChange: ({ current, previous }) => {

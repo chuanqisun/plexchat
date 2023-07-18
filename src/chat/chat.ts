@@ -1,6 +1,6 @@
-import { dfsPack } from "./packing";
-import { Assignment, RunFn, ScheduleFn, SchedulerState, createTaskManager } from "./scheduler";
-import { ChatInput, ChatOutput } from "./types";
+import { dfsPack } from "../scheduler/packing";
+import { createTaskManager, type Assignment, type RunFn, type ScheduleFn, type SchedulerState } from "../scheduler/scheduler";
+import type { ChatInput, ChatOutput } from "./types";
 
 export function simpleChat(workerChat: LoopChat, models: string[], input: SimpleChatInput): Promise<ChatOutput> {
   const fullInput = getInput(input);
@@ -17,7 +17,7 @@ export interface AzureOpenAIChatWorkerConfig {
 export function azureOpenAIChatWorker(config: AzureOpenAIChatWorkerConfig): ChatWorker {
   let currentId = 0;
   const { endpoint, apiKey, model, tokensPerMinute } = config;
-  const run = async (input) => {
+  const run = async (input: ChatInput) => {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {

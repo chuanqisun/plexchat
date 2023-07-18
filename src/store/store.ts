@@ -13,7 +13,7 @@ export type OnTransformChangeHook<T> = (input: OnTransformChangeHookInput<T>) =>
 export interface OnTransformChangeHookInput<T> {
   current: T;
   previous: T;
-  abort();
+  abort: () => void;
   update: Update<T>;
 }
 
@@ -44,7 +44,7 @@ export function createStore<T extends NonNullable<any>>(plugins: Plugin<T>[]) {
   if (!hooks.onInit.length) throw new Error("At least one plugin should have onInit hook");
   let state = hooks.onInit.reduce<undefined | T>((acc, hook) => hook({ current: acc }), undefined)!;
 
-  const onTransformChange = (current, previous) =>
+  const onTransformChange = (current: T, previous: T) =>
     hooks.onTransformChange.reduce(
       (acc, hook) => {
         if (acc.isAborted) return acc;
@@ -69,7 +69,7 @@ export function createStore<T extends NonNullable<any>>(plugins: Plugin<T>[]) {
     const transformed = onTransformChange(updateFn(prev), prev);
     if (transformed.isAborted) return;
 
-    state = transformed.state;
+    state = transformed.state!; // non-null unless aborted
     onDidChange(state, prev);
   }
 

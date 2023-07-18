@@ -1,5 +1,5 @@
-import { createLoopChat, simpleChat } from "../chat";
-import { ChatInput, ChatOutput } from "../types";
+import { createLoopChat, simpleChat } from "./chat";
+import type { ChatInput, ChatOutput } from "./types";
 
 const chat = createLoopChat({
   verbose: true,

@@ -1,4 +1,4 @@
-import { azureOpenAIChatWorker, createLoopChat, simpleChat } from "../chat";
+import { azureOpenAIChatWorker, createLoopChat, simpleChat } from "./chat";
 
 const chat = createLoopChat({
   verbose: true,
