@@ -125,7 +125,7 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
 
       const availableParallelism = mutableWorker.original.spec.parallelism - mutableWorker.historyDemands.length;
 
-      const affordableTasks = dfsSelectTaskIndices(mutableWorker.original, mutableTasks).map((index) => mutableTasks[index]);
+      const affordableTasks = selectTaskIndices(mutableWorker.original, mutableTasks).map((index) => mutableTasks[index]);
 
       const parallelControlledTasks = affordableTasks.slice(0, availableParallelism);
       if (!parallelControlledTasks.length) continue; // next worker when no affordable task
@@ -193,7 +193,7 @@ function removeWorkerExpiredTasks(workers: ChatWorker[], now: number): ChatWorke
   }));
 }
 
-function dfsSelectTaskIndices(worker: ChatWorker, tasks: ChatTask[]) {
+function selectTaskIndices(worker: ChatWorker, tasks: ChatTask[]) {
   const capacity = worker.spec.tokenLimit - worker.historyTasks.reduce((acc, task) => acc + task.demand.totalTokens, 0);
 
   const pickedIndices = fifoPack(
