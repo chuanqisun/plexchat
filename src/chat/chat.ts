@@ -33,9 +33,7 @@ export function azureOpenAIChatWorker(config: AzureOpenAIChatWorkerConfig): Chat
 
 export interface WorkerChatConfig {
   workers: ChatWorker[];
-  maxRetry?: number;
   verbose?: boolean;
-  onNextTick?: (task: () => any) => void;
 }
 
 export interface ProxyConfig {
@@ -63,8 +61,7 @@ export const getOpenAIJsonProxy =
 export type LoopChat = (input: ChatInput, demand: ChatTaskDemand) => Promise<ChatOutput>;
 
 export function createLoopChat(config: WorkerChatConfig): LoopChat {
-  const { workers, verbose = false, maxRetry = 3 } = config;
-  let currentJobId = 0;
+  const { workers, verbose = false } = config;
   let isTicking = false;
   const taskManager = createTaskManager<ChatTask, ChatWorker>(getChatScheduler(), getChatRunner());
   taskManager.addWorker(...workers);
@@ -106,7 +103,7 @@ export function createLoopChat(config: WorkerChatConfig): LoopChat {
         id: crypto.randomUUID(),
         input,
         demand,
-        retryLeft: maxRetry,
+        retryLeft: demand.maxRetry,
         onSuccess: resolve,
         onError: reject,
       });
@@ -135,6 +132,7 @@ export function getDemand(models: string[], input: DemandChatInput): ChatTaskDem
     acceptModels: models,
     outputTokens: input.max_tokens,
     inputTokens: input.messages.flatMap((msg) => msg.content.split(" ")).length,
+    maxRetry: 3,
   };
 }
 
@@ -161,13 +159,13 @@ export interface ChatWorkerSpec {
   models: string[];
   tokenLimit: number;
   tokenLimitWindowSize: number;
-  // tokensPerMinute: number;
 }
 
 export interface ChatTaskDemand {
   acceptModels: string[];
   outputTokens: number;
   inputTokens: number;
+  maxRetry: number;
 }
 
 export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
