@@ -1,6 +1,7 @@
-import { azureOpenAIChatWorker, createLoopChat, getOpenAIJsonProxy, simpleChat } from "./chat";
+import { azureOpenAIChatWorker, createChatEngine, getOpenAIJsonProxy } from "./chat";
+import { demoChat } from "./chat-demo";
 
-const chat = createLoopChat({
+const chat = createChatEngine({
   verbose: true,
   workers: [
     azureOpenAIChatWorker({
@@ -14,7 +15,7 @@ const chat = createLoopChat({
   ],
 });
 
-simpleChat(chat, ["gpt-35-turbo"], {
+demoChat(chat, ["gpt-35-turbo"], {
   messages: [
     {
       role: "user",
@@ -24,7 +25,7 @@ simpleChat(chat, ["gpt-35-turbo"], {
   max_tokens: 150,
 }).then((r) => console.log(r.choices[0].message.content));
 
-simpleChat(chat, ["gpt-35-turbo"], {
+demoChat(chat, ["gpt-35-turbo"], {
   messages: [
     {
       role: "user",

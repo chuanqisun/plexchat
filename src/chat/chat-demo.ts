@@ -1,7 +1,13 @@
-import { createLoopChat, simpleChat } from "./chat";
+import { createChatEngine, getEstimatedDemand, getInput, type ChatEngine, type SimpleChatInput } from "./chat";
 import type { ChatInput, ChatOutput } from "./types";
 
-const chat = createLoopChat({
+export function demoChat(chatEngine: ChatEngine, models: string[], input: SimpleChatInput): Promise<ChatOutput> {
+  const fullInput = getInput(input);
+  const fullDemand = getEstimatedDemand(models, fullInput);
+  return chatEngine(fullInput, fullDemand);
+}
+
+const chatEngine = createChatEngine({
   verbose: true,
   workers: [
     {
@@ -54,7 +60,7 @@ function mockChatApi(prefix: string, input: ChatInput): Promise<ChatOutput> {
     }, 1000);
   });
 }
-simpleChat(chat, ["model1", "model2"], {
+demoChat(chatEngine, ["model1", "model2"], {
   messages: [
     {
       role: "user",
@@ -64,7 +70,7 @@ simpleChat(chat, ["model1", "model2"], {
   max_tokens: 0,
 }).then(console.log);
 
-simpleChat(chat, ["model1", "model2"], {
+demoChat(chatEngine, ["model1", "model2"], {
   messages: [
     {
       role: "user",
@@ -73,7 +79,7 @@ simpleChat(chat, ["model1", "model2"], {
   ],
   max_tokens: 0,
 }).then(console.log);
-simpleChat(chat, ["model1", "model2"], {
+demoChat(chatEngine, ["model1", "model2"], {
   messages: [
     {
       role: "user",

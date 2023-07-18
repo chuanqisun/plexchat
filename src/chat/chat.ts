@@ -2,12 +2,6 @@ import { dfsPack } from "../scheduler/packing";
 import { createTaskManager, type Assignment, type RunFn, type ScheduleFn, type SchedulerState } from "../scheduler/scheduler";
 import type { ChatInput, ChatOutput } from "./types";
 
-export function simpleChat(workerChat: LoopChat, models: string[], input: SimpleChatInput): Promise<ChatOutput> {
-  const fullInput = getInput(input);
-  const fullDemand = getDemand(models, fullInput);
-  return workerChat(fullInput, fullDemand);
-}
-
 export interface AzureOpenAIChatWorkerConfig {
   model: string;
   tokensPerMinute: number;
@@ -58,9 +52,9 @@ export const getOpenAIJsonProxy =
     return result as ChatOutput;
   };
 
-export type LoopChat = (input: ChatInput, demand: ChatTaskDemand) => Promise<ChatOutput>;
+export type ChatEngine = (input: ChatInput, demand: ChatTaskDemand) => Promise<ChatOutput>;
 
-export function createLoopChat(config: WorkerChatConfig): LoopChat {
+export function createChatEngine(config: WorkerChatConfig): ChatEngine {
   const { workers, verbose = false } = config;
   let isTicking = false;
   const taskManager = createTaskManager<ChatTask, ChatWorker>(getChatScheduler(), getChatRunner());
@@ -96,7 +90,7 @@ export function createLoopChat(config: WorkerChatConfig): LoopChat {
     }
   }
 
-  const chat: LoopChat = async (input: ChatInput, demand: ChatTaskDemand) => {
+  const chat: ChatEngine = async (input: ChatInput, demand: ChatTaskDemand) => {
     startClock();
     return new Promise<ChatOutput>((resolve, reject) => {
       taskManager.addTask({
@@ -127,11 +121,10 @@ export function getInput(input: SimpleChatInput): ChatInput {
 }
 
 export type DemandChatInput = Partial<ChatInput> & Pick<ChatInput, "messages" | "max_tokens">;
-export function getDemand(models: string[], input: DemandChatInput): ChatTaskDemand {
+export function getEstimatedDemand(models: string[], input: DemandChatInput): ChatTaskDemand {
   return {
     acceptModels: models,
-    outputTokens: input.max_tokens,
-    inputTokens: input.messages.flatMap((msg) => msg.content.split(" ")).length,
+    totalTokens: input.max_tokens + input.messages.flatMap((msg) => msg.content.split(" ")).length * 1.5,
     maxRetry: 3,
   };
 }
@@ -163,8 +156,7 @@ export interface ChatWorkerSpec {
 
 export interface ChatTaskDemand {
   acceptModels: string[];
-  outputTokens: number;
-  inputTokens: number;
+  totalTokens: number;
   maxRetry: number;
 }
 
@@ -248,11 +240,11 @@ function removeWorkerExpiredTasks(workers: ChatWorker[], now: number): ChatWorke
 }
 
 function dfsSelectTaskIndices(worker: ChatWorker, tasks: ChatTask[]) {
-  const capacity = worker.spec.tokenLimit - worker.historyTasks.reduce((acc, task) => acc + task.demand.inputTokens + task.demand.outputTokens, 0);
+  const capacity = worker.spec.tokenLimit - worker.historyTasks.reduce((acc, task) => acc + task.demand.totalTokens, 0);
 
   const pickedIndices = dfsPack(
     capacity,
-    tasks.map((task) => task.demand.inputTokens + task.demand.outputTokens)
+    tasks.map((task) => task.demand.totalTokens)
   );
 
   return pickedIndices;
