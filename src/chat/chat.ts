@@ -216,7 +216,7 @@ function removeTaskFromQueue(queue: ChatTask[], taskId: string): ChatTask[] {
 function removeWorkerExpiredTasks(workers: ChatWorker[], now: number): ChatWorker[] {
   return workers.map((w) => ({
     ...w,
-    historyTasks: w.historyTasks.filter((t) => t.expireAt > now),
+    historyTasks: w.historyTasks.filter((t) => t.expireAt > now || t.isRunning),
   }));
 }
 
