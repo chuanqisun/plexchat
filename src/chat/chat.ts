@@ -39,8 +39,10 @@ export function getChatTaskRunner(config: ChatSchedulerConfig): ChatTaskRunner {
       );
     }
 
+    console.log({ tasks: taskManager.getTasks(), workers: taskManager.getWorkers() });
+
     if (taskManager.getTasks().length) {
-      setTimeout(gc, 100);
+      setTimeout(gc, 1000);
     } else {
       isTicking = false;
     }
@@ -97,6 +99,7 @@ export type OpenAIJsonProxy = (input: ChatInput) => Promise<ChatOutput>;
 
 export interface ChatWorkerSpec {
   models: ModelName[];
+  parallelism: number;
   tokenLimit: number;
   tokenLimitWindowSize: number;
 }
@@ -121,11 +124,13 @@ export function getChatScheduler(): ScheduleFn<ChatTask, ChatWorker> {
       if (!mutableTasks.length) break; // stop when no task left
 
       const affordableTasks = dfsSelectTaskIndices(mutableWorker.original, mutableTasks).map((index) => mutableTasks[index]);
-      if (!affordableTasks.length) continue; // next worker when no affordable task
 
-      mutableWorker.historyDemands.push(...affordableTasks.map((task) => task.demand));
-      mutableTasks = mutableTasks.filter((task) => !affordableTasks.includes(task));
-      assignments.push(...affordableTasks.map((task) => ({ task, worker: mutableWorker.original })));
+      const parallelControlledTasks = affordableTasks.slice(0, mutableWorker.original.spec.parallelism);
+      if (!parallelControlledTasks.length) continue; // next worker when no affordable task
+
+      mutableWorker.historyDemands.push(...parallelControlledTasks.map((task) => task.demand));
+      mutableTasks = mutableTasks.filter((task) => !parallelControlledTasks.includes(task));
+      assignments.push(...parallelControlledTasks.map((task) => ({ task, worker: mutableWorker.original })));
     }
 
     return {

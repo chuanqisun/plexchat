@@ -13,6 +13,7 @@ const chatTaskRunner = getChatTaskRunner({
       }),
       model: "gpt-35-turbo",
       tokenLimit: 200,
+      parallelism: 3,
       tokenLimitWindowSize: 3_000, // simulate limit: 200 tokens per 3 seconds
     }),
   ],
