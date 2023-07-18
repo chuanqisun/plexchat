@@ -163,6 +163,7 @@ export function getChatRunner(): RunFn<ChatTask, ChatWorker> {
           console.log("requeued on error", err);
           update((prev) => ({
             ...prev,
+            workers: markRunningTaskAsStopped(prev.workers, worker.id, task.id),
             tasks: addTaskToQueue(prev.tasks, { ...task, retryLeft: task.retryLeft - 1 }),
           }));
         }
