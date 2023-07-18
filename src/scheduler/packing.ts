@@ -41,3 +41,17 @@ export function greedyPack(bagSize: number, items: number[]): number[] {
 
   return currentBag.itemIndices.sort();
 }
+
+export function fifoPack(bagSize: number, items: number[]): number[] {
+  const itemsQueue = [...items].map((size, index) => ({ size, index }));
+  let currentBag: Bag = { sum: 0, itemIndices: [] };
+
+  for (let i = 0; i < itemsQueue.length; i++) {
+    if (currentBag.sum + itemsQueue[i].size <= bagSize) {
+      currentBag.sum += itemsQueue[i].size;
+      currentBag.itemIndices.push(itemsQueue[i].index);
+    }
+  }
+
+  return currentBag.itemIndices.sort();
+}
