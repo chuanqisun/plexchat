@@ -1,4 +1,5 @@
-// ref: https://learn.microsoft.com/en-us/azure/cognitive-services/openai/reference
+// schema: https://github.com/Azure/azure-rest-api-specs/blob/main/specification/cognitiveservices/data-plane/AzureOpenAI/inference/readme.md
+// doc: https://learn.microsoft.com/en-us/azure/cognitive-services/openai/reference
 export interface ChatInput {
   messages: ChatMessage[];
   /**
@@ -32,6 +33,10 @@ export type ChatOutput = {
     message: {
       content?: string; // blank when content_filter is active
       role: "assistant";
+      function_call?: {
+        name: string;
+        arguments: string;
+      };
     };
   }[];
   usage: {
