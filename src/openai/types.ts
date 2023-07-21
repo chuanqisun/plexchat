@@ -2,9 +2,6 @@
 // doc: https://learn.microsoft.com/en-us/azure/cognitive-services/openai/reference
 export interface ChatInput {
   messages: ChatMessage[];
-  /**
-   * Pending support: https://stackoverflow.com/questions/76543136/how-to-do-function-calling-using-azure-openai
-   */
   functions?: FunctionDefinition[];
   function_call?: "auto" | "none" | { name: string };
   temperature: number;
@@ -17,7 +14,11 @@ export interface ChatInput {
 
 export interface ChatMessage {
   role: "assistant" | "system" | "user";
-  content: string;
+  content: string; // FIXME: blank when content_filter or function_call is active
+  function_call?: {
+    name: string;
+    arguments: string;
+  };
 }
 
 export interface FunctionDefinition {
@@ -30,14 +31,7 @@ export type ChatOutput = {
   choices: {
     finish_reason: "stop" | "length" | "content_filter" | null;
     index: number;
-    message: {
-      content?: string; // blank when content_filter is active
-      role: "assistant";
-      function_call?: {
-        name: string;
-        arguments: string;
-      };
-    };
+    message: ChatMessage;
   }[];
   usage: {
     completion_tokens: number;
