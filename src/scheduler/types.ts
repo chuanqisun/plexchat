@@ -18,13 +18,13 @@ export interface IWorkerTaskRequest {
 export interface IWorkerTaskResponse {
   data?: ChatOutput;
   error?: any;
+  shouldRetry?: boolean;
 }
 
 export interface IChatTask {
   tokenDemand: number;
   models: string[];
   input: ChatInput;
-  controller?: AbortController;
 }
 
 export interface IChatWorker {

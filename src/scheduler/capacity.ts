@@ -9,13 +9,22 @@ interface Usage {
   usage1s: number;
 }
 
+export interface Capacity {
+  tokens: number;
+  requests: number;
+}
+
 /**
  * Ref: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/quota#understanding-rate-limits
  * check tpm capacity (1 min window: < tpm limit)
  * check tpm capacity (10 sec window: < (tpm - consumed)/6 if not first req)
  * check tpm capacity (1 sec window: < (tpm - consumed)/60 if not first req)
+ *
+ * Additionally, there seems to be an undocumented requests per 10 seconds limit.
+ * The limits are available from the Deployment Management API
+ * Ref: https://learn.microsoft.com/en-us/rest/api/cognitiveservices/accountmanagement/deployments/list
  */
-export function getTokenCapacity(tokensPerMinute: number, records: TaskRecord[]): number {
+export function getCapacity(requestsPerMinute: number, tokensPerMinute: number, records: TaskRecord[]): Capacity {
   const ago60s = Date.now() - 60_000;
   const ago10s = Date.now() - 10_000;
   const ago1s = Date.now() - 1_000;
@@ -52,9 +61,15 @@ export function getTokenCapacity(tokensPerMinute: number, records: TaskRecord[])
     }
   );
 
-  const capcity60s = tokensPerMinute - windowedRecords.usage60s;
-  const capacity10s = windowedRecords.count10s > 0 ? tokensPerMinute / 6 - windowedRecords.usage10s : capcity60s;
-  const capacity1s = windowedRecords.count1s > 0 ? tokensPerMinute / 60 - windowedRecords.usage1s : capcity60s;
+  const tokenCapcity60s = tokensPerMinute - windowedRecords.usage60s;
+  const tokenCapacity10s = windowedRecords.count10s > 0 ? tokensPerMinute / 6 - windowedRecords.usage10s : tokenCapcity60s;
+  const tokenCapacity1s = windowedRecords.count1s > 0 ? tokensPerMinute / 60 - windowedRecords.usage1s : tokenCapcity60s;
 
-  return Math.min(capacity1s, capacity10s, capcity60s);
+  const requestCapacity60s = requestsPerMinute - windowedRecords.count60s;
+  const requestCapacity10s = requestsPerMinute / 6 - windowedRecords.count10s;
+
+  return {
+    tokens: Math.min(tokenCapacity1s, tokenCapacity10s, tokenCapcity60s),
+    requests: Math.min(requestCapacity10s, requestCapacity60s),
+  };
 }

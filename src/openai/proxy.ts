@@ -1,12 +1,12 @@
-import type { ChatProxy } from "../scheduler/worker";
+import type { WorkerChatProxy } from "../scheduler/worker";
 import type { ChatInput, ChatOutput } from "./types";
 
 export interface ProxyConfig {
   apiKey: string;
   endpoint: string;
 }
-export function getOpenAIJsonProxy({ apiKey, endpoint }: ProxyConfig): ChatProxy {
-  return async (input: ChatInput, signal?: AbortSignal) => {
+export function getOpenAIWorkerProxy({ apiKey, endpoint }: ProxyConfig): WorkerChatProxy {
+  return async (input: ChatInput, init?: RequestInit) => {
     let response: Response;
     try {
       response = await fetch(endpoint, {
@@ -16,7 +16,7 @@ export function getOpenAIJsonProxy({ apiKey, endpoint }: ProxyConfig): ChatProxy
           "api-key": apiKey,
         },
         body: JSON.stringify(input),
-        signal,
+        ...init,
       });
     } catch (e) {
       // fetch or abort error

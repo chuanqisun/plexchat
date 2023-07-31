@@ -3,7 +3,7 @@
 export interface ChatInput {
   messages: ChatMessage[];
   functions?: FunctionDefinition[];
-  function_call?: "auto" | "none" | { name: string };
+  function_call?: FunctionCallRequest;
   temperature: number;
   top_p: number;
   frequency_penalty: number;
@@ -12,13 +12,17 @@ export interface ChatInput {
   stop: null | string | string[];
 }
 
+export type FunctionCallRequest = "auto" | "none" | { name: string };
+
 export interface ChatMessage {
   role: "assistant" | "system" | "user";
   content: string; // FIXME: blank when content_filter or function_call is active
-  function_call?: {
-    name: string;
-    arguments: string;
-  };
+  function_call?: FunctionCallRecord;
+}
+
+export interface FunctionCallRecord {
+  name: string;
+  arguments: string;
 }
 
 export interface FunctionDefinition {
