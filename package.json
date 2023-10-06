@@ -1,5 +1,5 @@
 {
-  "name": "burstio",
+  "name": "plexchat",
   "version": "1.0.0",
   "description": "High throughput Azure OpenAI Chat Client",
   "main": "src/index.ts",

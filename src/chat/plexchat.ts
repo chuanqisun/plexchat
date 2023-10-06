@@ -24,7 +24,7 @@ export interface ProxiesConfig {
   logLevel?: LogLevel;
 }
 
-export function getChatProxies(config: ProxiesConfig) {
+export function plexchat(config: ProxiesConfig) {
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getChatWorkers({ logLevel: config.logLevel, ...manifest })),
     logLevel: config.logLevel ?? LogLevel.Info,
