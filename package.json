@@ -13,5 +13,8 @@
   "devDependencies": {
     "@types/node": "^20.4.1",
     "tsx": "^3.12.7"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^2.1.1"
   }
 }
