@@ -33,8 +33,8 @@ export function plexchat(config: ProxiesConfig) {
   const chatProxy: SimpleChatProxy = (input: SimpleChatInput) => {
     const { models, ...standardInput } = input;
 
-    const chatTokenDemand = gptTokenzier.encodeChat(input.messages, "gpt-3.5-turbo").length * 1.05;
-    const functionCallTokenDemand = input.functions ? gptTokenzier.encode(JSON.stringify(input.functions)).length * 1.05 : 0;
+    const chatTokenDemand = gptTokenzier.encodeChat(input.messages, "gpt-3.5-turbo").length * 1.2;
+    const functionCallTokenDemand = input.functions ? gptTokenzier.encode(JSON.stringify(input.functions)).length * 1.2 : 0;
     const responseTokenDemand = input.max_tokens ?? defaultChatInput.max_tokens;
 
     return manager.submit({
