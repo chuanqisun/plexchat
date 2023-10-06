@@ -50,7 +50,18 @@ export function plexchat(config: ProxiesConfig) {
       },
     });
 
+  const gptProxy: SimpleChatProxy = (input: SimpleChatInput) =>
+    manager.submit({
+      tokenDemand: gptTokenzier.encodeChat(input.messages, "gpt-3.5-turbo").length * 1.05 + (input.max_tokens ?? defaultChatInput.max_tokens),
+      models: ["gpt-35-turbo", "gpt-35-turbo-16k", "gpt-4", "gpt-4-32k"],
+      input: {
+        ...defaultChatInput,
+        ...input,
+      },
+    });
+
   return {
+    gptProxy,
     gpt35Proxy,
     gpt4Proxy,
   };
