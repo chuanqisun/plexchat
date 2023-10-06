@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "description": "High throughput Azure OpenAI Chat Client",
   "main": "src/index.ts",
+  "homepage": "https://github.com/chuanqisun/plexchat",
   "types": "src/index.ts",
   "scripts": {
     "test": "tsx ./src/index.test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chuanqisun/plexchat.git"
   },
   "keywords": [],
   "author": "",
