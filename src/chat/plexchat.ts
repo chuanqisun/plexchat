@@ -30,15 +30,17 @@ export function plexchat(config: ProxiesConfig) {
     logLevel: config.logLevel ?? LogLevel.Info,
   });
 
-  const chatProxy: SimpleChatProxy = (input: SimpleChatInput) =>
-    manager.submit({
+  const chatProxy: SimpleChatProxy = (input: SimpleChatInput) => {
+    const { models, ...standardInput } = input;
+    return manager.submit({
       tokenDemand: gptTokenzier.encodeChat(input.messages, "gpt-3.5-turbo").length * 1.05 + (input.max_tokens ?? defaultChatInput.max_tokens),
-      models: input.models ?? ["gpt-35-turbo", "gpt-35-turbo-16k"],
+      models: models ?? ["gpt-35-turbo", "gpt-35-turbo-16k"],
       input: {
         ...defaultChatInput,
-        ...input,
+        ...standardInput,
       },
     });
+  };
 
   return {
     chatProxy,

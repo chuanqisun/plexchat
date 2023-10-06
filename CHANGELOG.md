@@ -1,4 +1,4 @@
-# v0.0.3
+# v0.0.4
 
 - Changed: Simplified chat proxy, allowing model override
 
