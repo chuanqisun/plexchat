@@ -1,3 +1,7 @@
+# v0.0.6
+
+- Fixed: Logger level handling
+
 # v0.0.5
 
 - Fixed: Token estimation error for function calling

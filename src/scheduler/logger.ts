@@ -15,10 +15,10 @@ export enum LogLevel {
 }
 export function getLogger(level: LogLevel = LogLevel.Error) {
   const logger: ILogger = {
-    debug: (...args) => (level > LogLevel.Debug ? console.debug(...args) : undefined),
+    debug: (...args) => (level >= LogLevel.Debug ? console.debug(...args) : undefined),
     info: (...args) => (level >= LogLevel.Info ? console.log(...args) : undefined),
     warn: (...args) => (level >= LogLevel.Warn ? console.warn(...args) : undefined),
-    error: (...args) => (level > LogLevel.Debug ? console.error(...args) : undefined),
+    error: (...args) => (level >= LogLevel.Error ? console.error(...args) : undefined),
   };
 
   return logger;
