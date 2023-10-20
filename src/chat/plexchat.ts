@@ -5,6 +5,9 @@ import { ChatManager } from "../scheduler/manager";
 import { getChatWorkers, type ChatEndpointManifest } from "./get-chat-workers";
 
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages"> & { models?: ModelName[] };
+
+export type SimpleEmbedProxy = (input: string[]) => Promise<{ embedding: number[] }[]>;
+
 export interface SimpleChatProxy {
   (input: SimpleChatInput): Promise<ChatOutput>;
 }
@@ -30,6 +33,18 @@ export function plexchat(config: ProxiesConfig) {
     logLevel: config.logLevel ?? LogLevel.Info,
   });
 
+  const embedProxy: SimpleEmbedProxy = (texts: string[]) => {
+    const tokenDemand = texts.map((str) => gptTokenzier.encode(str)).reduce((acc, cur) => acc + cur.length, 0);
+
+    return manager
+      .submit({
+        tokenDemand,
+        models: ["text-embedding-ada-002"],
+        input: { input: texts },
+      })
+      .then((result) => result.data);
+  };
+
   const chatProxy: SimpleChatProxy = (input: SimpleChatInput) => {
     const { models, ...standardInput } = input;
 
@@ -49,5 +64,6 @@ export function plexchat(config: ProxiesConfig) {
 
   return {
     chatProxy,
+    embedProxy,
   };
 }

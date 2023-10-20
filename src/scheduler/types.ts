@@ -1,7 +1,5 @@
-import type { ChatInput, ChatOutput } from "../openai/types";
-
 export interface IChatTaskManager {
-  submit: (task: IChatTask) => Promise<ChatOutput>;
+  submit: (task: IChatTask) => Promise<any>;
   abortAll: () => void;
 }
 
@@ -16,7 +14,7 @@ export interface IWorkerTaskRequest {
 }
 
 export interface IWorkerTaskResponse {
-  data?: ChatOutput;
+  data?: any;
   error?: any;
   shouldRetry?: boolean;
 }
@@ -24,7 +22,7 @@ export interface IWorkerTaskResponse {
 export interface IChatTask {
   tokenDemand: number;
   models: string[];
-  input: ChatInput;
+  input: any;
 }
 
 export interface IChatWorker {

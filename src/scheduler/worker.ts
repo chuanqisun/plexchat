@@ -1,5 +1,4 @@
 import { TIMEOUT_ABORT_REASON, withTimeout } from "../controller/timeout";
-import type { ChatInput, ChatOutput } from "../openai/types";
 import { getCapacity } from "./capacity";
 import { LogLevel, getLogger, type ILogger } from "./logger";
 import { Poller } from "./poller";
@@ -22,10 +21,10 @@ export interface ChatWorkerConfig {
   logLevel?: LogLevel;
 }
 
-export type WorkerChatProxy = (input: ChatInput, init?: RequestInit) => Promise<WorkerChatProxyResult>;
+export type WorkerChatProxy = (input: any, init?: RequestInit) => Promise<WorkerChatProxyResult>;
 
 export interface WorkerChatProxyResult {
-  data?: ChatOutput;
+  data?: any;
   error?: string;
   retryAfterMs?: number;
 }
@@ -102,7 +101,7 @@ export class ChatWorker implements IChatWorker {
   }
 
   private getTaskRequest(): IWorkerTaskRequest {
-    // BLocked due to cooldown
+    // Blocked due to cooldown
     if (this.coolDownUntil > Date.now()) {
       return {
         tokenCapacity: 0,

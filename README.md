@@ -13,7 +13,7 @@ npm i plexchat
 ```ts
 import { plexchat } from "plexchat";
 
-const { gpt35Proxy, gpt4Proxy } = plexchat({
+const { chatProxy, embedProxy } = plexchat({
   manifests: [
     {
       apiKey: "<Azure OpenAI Api Key>",
@@ -47,12 +47,19 @@ const { gpt35Proxy, gpt4Proxy } = plexchat({
           rpm: 360,
           tpm: 60_000,
         },
+        {
+          deploymentName: "text-embedding-ada-002",
+          modelName: "text-embedding-ada-002",
+          contextWindow: 2_048,
+          rpm: 720,
+          tpm: 120_000,
+        },
       ],
     },
   ],
 });
 
-gpt35Proxy({
+chatProxy({
   messages: [
     {
       role: "system",
@@ -64,6 +71,8 @@ gpt35Proxy({
     },
   ],
 });
+
+embedProxy(["Hello world", "Fizz buzz"]);
 ```
 
 ## Limitations

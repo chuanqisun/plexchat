@@ -1,10 +1,9 @@
-import type { ChatOutput } from "../openai/types";
 import { LogLevel, getLogger, type ILogger } from "./logger";
 import type { IChatTask, IChatTaskManager, IChatWorker, IChatWorkerManager, IWorkerTaskRequest, IWorkerTaskResponse } from "./types";
 
 interface TaskHandle {
   task: IChatTask;
-  resolve: (result: ChatOutput) => void;
+  resolve: (result: any) => void;
   reject: (error: any) => void;
   isRunning?: boolean;
   retryLeft: number;
@@ -25,7 +24,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   }
 
   public async submit(task: IChatTask) {
-    return new Promise<ChatOutput>((resolve, reject) => {
+    return new Promise<any>((resolve, reject) => {
       const taskHandle: TaskHandle = {
         task,
         retryLeft: 3,

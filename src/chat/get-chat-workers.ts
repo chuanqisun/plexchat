@@ -30,10 +30,17 @@ const defaults = {
   concurrentcy: 10,
 };
 
+
 export function getChatWorkers(manfest: ChatEndpointManifest) {
   return manfest.models.map((model) => {
     const endpoint = new URL(manfest.endpoint);
-    endpoint.pathname = `/openai/deployments/${model.deploymentName}/chat/completions`;
+    
+    if (model.modelName === "text-embedding-ada-002") {
+      endpoint.pathname = `/openai/deployments/${model.deploymentName}/embeddings`;
+    } else {
+      endpoint.pathname = `/openai/deployments/${model.deploymentName}/chat/completions`;
+    }
+
     endpoint.searchParams.set("api-version", model.apiVersion ?? manfest.apiVersion ?? defaults.apiVersion);
 
     return new ChatWorker({

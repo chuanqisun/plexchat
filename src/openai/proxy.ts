@@ -1,5 +1,5 @@
 import type { WorkerChatProxy } from "../scheduler/worker";
-import type { ChatInput, ChatOutput } from "./types";
+import type { ChatInput } from "./types";
 
 export interface ProxyConfig {
   apiKey: string;
@@ -49,8 +49,7 @@ export function getOpenAIWorkerProxy({ apiKey, endpoint }: ProxyConfig): WorkerC
     }
 
     try {
-      const result = (await response.json()) as ChatOutput;
-      if (!Array.isArray(result.choices)) throw new Error("Invalid response from OpenAI API");
+      const result = (await response.json()) as any;
       return {
         data: result,
       };
