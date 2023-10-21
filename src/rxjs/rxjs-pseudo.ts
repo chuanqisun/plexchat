@@ -1,8 +1,14 @@
+import { Subject } from "rxjs";
+
 export default {};
+
+const newTask$ = new Subject<any>();
+const completedTask$ = new Subject<any>();
 
 type SubmitEvent = Event;
 type ManagerQueueUpdateEvent = Event;
 type WorkerQueueUpdateEvent = Event;
+
 
 type Task = any;
 
