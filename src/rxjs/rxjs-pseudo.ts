@@ -1,4 +1,5 @@
-import { Subject, filter, mergeMap, tap } from "rxjs";
+import { randomUUID } from "crypto";
+import { Subject, filter, first, map, mergeMap } from "rxjs";
 
 export default {};
 
@@ -10,12 +11,46 @@ export interface TaskHandle {
 
 const task$ = new Subject<TaskHandle>();
 
+task$.subscribe(console.log);
+
+// success stream
 task$
   .pipe(
-    mergeMap((handle) => new Promise<TaskHandle>((resolve) => resolve({ ...handle, result: Math.random() }))),
-    tap(console.log),
-    filter((handle) => handle.result <= 0.9) // similate 90% error rate
+    filter((handle) => !handle.result),
+    mergeMap((handle) => new Promise<TaskHandle>((resolve) => resolve({ ...handle, result: Math.random() })))
   )
   .subscribe(task$);
 
-task$.next({ id: "1", task: "task1" });
+// retry stream
+task$
+  .pipe(
+    filter((handle) => handle.result && handle.result < 0.5),
+    map((handle) => ({ ...handle, result: undefined })) // retry
+  )
+  .subscribe(task$);
+
+async function submit(task: any) {
+  const newHandle = { id: randomUUID(), task };
+  const resultAsync = new Promise((resolve, reject) =>
+    task$
+      .pipe(
+        filter((completeHandle) => completeHandle.id === newHandle.id && completeHandle.result >= 0.5),
+        first()
+      )
+      .subscribe({
+        next: resolve,
+        error: reject,
+      })
+  );
+
+  task$.next(newHandle);
+
+  return resultAsync;
+}
+
+async function main() {
+  const final = await Promise.all([submit("task 1"), submit("task 2"), submit("task 3")]);
+  console.log("final", JSON.stringify(final, null, 2));
+}
+
+main();
