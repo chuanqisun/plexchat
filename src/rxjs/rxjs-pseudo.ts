@@ -1,31 +1,21 @@
-import { Subject, filter, map } from "rxjs";
+import { Subject, filter, mergeMap, tap } from "rxjs";
 
 export default {};
 
-export const enum Status {
-  Pending = "pending",
-  Running = "running",
-  Completed = "completed",
-  Failed = "failed",
-}
-
 export interface TaskHandle {
   id: string;
-  status: Status;
   task: any;
+  result?: any;
 }
 
 const task$ = new Subject<TaskHandle>();
 
 task$
   .pipe(
-    filter((handle) => handle.status === Status.Pending),
-    filter(() => true), // Match available worker)
-    map((handle) => ({ ...handle, status: Status.Running })) // update the state of task, then put it back
-    // update the state of task, then put it back
+    mergeMap((handle) => new Promise<TaskHandle>((resolve) => resolve({ ...handle, result: Math.random() }))),
+    tap(console.log),
+    filter((handle) => handle.result <= 0.9) // similate 90% error rate
   )
   .subscribe(task$);
 
-task$.subscribe(console.log);
-
-task$.next({ id: "123", status: Status.Pending, task: { hello: "world" } });
+task$.next({ id: "1", task: "task1" });
