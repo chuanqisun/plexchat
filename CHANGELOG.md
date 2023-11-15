@@ -1,6 +1,6 @@
 # v0.1.2
 
-- Fixed: Added missing type export for `LogLevel`
+- Fixed: Added missing type export for `LogLevel`, with default level being `Error`
 
 # v0.0.7
 
