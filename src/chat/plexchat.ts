@@ -30,7 +30,7 @@ export interface ProxiesConfig {
 export function plexchat(config: ProxiesConfig) {
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getChatWorkers({ logLevel: config.logLevel, ...manifest })),
-    logLevel: config.logLevel ?? LogLevel.Info,
+    logLevel: config.logLevel ?? LogLevel.Error,
   });
 
   const embedProxy: SimpleEmbedProxy = (texts: string[]) => {
