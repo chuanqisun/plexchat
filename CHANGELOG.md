@@ -1,3 +1,7 @@
+# v0.1.1
+
+- Fixed: Added missing type export for `LogLevel`
+
 # v0.0.7
 
 - Fixed: Logger level handling
