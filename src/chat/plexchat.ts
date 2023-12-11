@@ -62,7 +62,10 @@ export function plexchat(config: ProxiesConfig) {
     });
   };
 
+  const abortAll = () => manager.abortAll();
+
   return {
+    abortAll,
     chatProxy,
     embedProxy,
   };

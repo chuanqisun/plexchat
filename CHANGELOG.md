@@ -1,3 +1,7 @@
+# v0.2.0
+
+- Added: `abortAll` api
+
 # v0.1.2
 
 - Fixed: Added missing type export for `LogLevel`, with default level being `Error`
