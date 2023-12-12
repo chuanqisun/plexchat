@@ -75,13 +75,11 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     taskHandle.isRunning = false;
     this.taskHandles = this.taskHandles.filter((t) => t !== taskHandle);
 
-    if (result.error) {
+    if (result.error && !result.shouldRetry) {
+      this.logger.warn(`[manager] Non-retryable error`, result.error);
+      taskHandle.reject(result.error);
+    } else if (result.error) {
       taskHandle.retryLeft--;
-      // Exit condition:
-      // 1. Task is aborted by non-timeout reason, OR
-      // 2. Retry used up
-      //
-      // TODO, implement rule 1
       if (!taskHandle.retryLeft) {
         this.logger.warn(`[manager] no retry left`);
         taskHandle.reject(result.error);

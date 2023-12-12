@@ -1,3 +1,7 @@
+# v0.2.1
+
+- Fixed: Respect non-retryable error
+
 # v0.2.0
 
 - Added: `abortAll` api
