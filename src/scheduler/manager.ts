@@ -76,7 +76,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     this.taskHandles = this.taskHandles.filter((t) => t !== taskHandle);
 
     if (result.error && !result.shouldRetry) {
-      this.logger.warn(`[manager] Non-retryable error`, result.error);
+      this.logger.info(`[manager] Non-retryable error`, result.error);
       taskHandle.reject(result.error);
     } else if (result.error) {
       taskHandle.retryLeft--;

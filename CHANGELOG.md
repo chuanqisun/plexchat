@@ -1,3 +1,7 @@
+# v0.2.2
+
+- Fixed: Non-retryable error verbosity
+
 # v0.2.1
 
 - Fixed: Respect non-retryable error
