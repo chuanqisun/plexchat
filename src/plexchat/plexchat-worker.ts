@@ -1,10 +1,10 @@
 import { getTimeoutFunction } from "../controller/timeout";
 import { getOpenAIWorkerProxy } from "../openai/proxy";
-import type { ModelName } from "../openai/types";
+import type { ChatModelName, EmbedModelName } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatWorker } from "../scheduler/worker";
 
-export interface ChatEndpointManifest {
+export interface PlexEndpointManifest {
   apiKey: string;
   endpoint: string;
   apiVersion?: string;
@@ -13,7 +13,7 @@ export interface ChatEndpointManifest {
     apiVersion?: string;
     contextWindow: number;
     concurrentcy?: number;
-    modelName: ModelName;
+    modelName: ChatModelName | EmbedModelName;
     deploymentName: string;
     rpm: number;
     tpm: number;
@@ -30,11 +30,10 @@ const defaults = {
   concurrentcy: 10,
 };
 
-
-export function getChatWorkers(manfest: ChatEndpointManifest) {
+export function getPlexchatWorkers(manfest: PlexEndpointManifest) {
   return manfest.models.map((model) => {
     const endpoint = new URL(manfest.endpoint);
-    
+
     if (model.modelName === "text-embedding-ada-002") {
       endpoint.pathname = `/openai/deployments/${model.deploymentName}/embeddings`;
     } else {

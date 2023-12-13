@@ -24,7 +24,7 @@ export interface IChatTask {
   tokenDemand: number;
   models: string[];
   input: any;
-  context: any;
+  abortHandle?: string;
 }
 
 export interface IChatWorker {

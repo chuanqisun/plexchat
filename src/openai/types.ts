@@ -44,4 +44,5 @@ export type ChatOutput = {
   };
 };
 
-export type ModelName = "gpt-35-turbo" | "gpt-35-turbo-16k" | "gpt-4" | "gpt-4-32k" | "text-embedding-ada-002";
+export type ChatModelName = "gpt-35-turbo" | "gpt-35-turbo-16k" | "gpt-4" | "gpt-4-32k";
+export type EmbedModelName = "text-embedding-ada-002";

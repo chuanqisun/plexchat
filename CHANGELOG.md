@@ -1,3 +1,7 @@
+# v0.4.0
+
+- Changed: API cleanup and refactor
+
 # v0.3.0
 
 - Added: Individual task `abort` api
