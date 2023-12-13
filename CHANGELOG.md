@@ -1,3 +1,7 @@
+# v0.4.1
+
+- Added: Consistent typing for input params
+
 # v0.4.0
 
 - Changed: API cleanup and refactor

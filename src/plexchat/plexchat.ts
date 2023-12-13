@@ -8,7 +8,8 @@ export type SimpleChatProxy = (input: SimpleChatInput, context?: SimpleChatConte
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages">;
 export type SimpleChatContext = { models?: ChatModelName[]; abortHandle?: string };
 
-export type SimpleEmbedProxy = (input: string[], context?: SimpleEmbedContext) => Promise<{ embedding: number[] }[]>;
+export type SimpleEmbedProxy = (input: SimpleEmbedInput, context?: SimpleEmbedContext) => Promise<{ embedding: number[] }[]>;
+export type SimpleEmbedInput = string[];
 export type SimpleEmbedContext = { models?: EmbedModelName[]; abortHandle?: string };
 
 export interface TaskContext {
