@@ -1,3 +1,7 @@
+# v0.3.0
+
+- Added: Individual task `abort` api
+
 # v0.2.2
 
 - Fixed: Non-retryable error verbosity

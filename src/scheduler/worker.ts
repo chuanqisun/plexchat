@@ -81,6 +81,24 @@ export class ChatWorker implements IChatWorker {
     });
   }
 
+  public abort(selectTask: (task: IChatTask) => boolean) {
+    const tasksToAbort = this.tasks.filter((t) => selectTask(t.task));
+    if (tasksToAbort.length === 0) {
+      this.logger.info(`[worker] abort no task`);
+      return;
+    } else if (tasksToAbort.length === this.tasks.length) {
+      this.logger.info(`[worker] abort all tasks`);
+      this.abortAll();
+      return;
+    } else {
+      this.logger.info(`[worker] abort ${tasksToAbort.length} tasks`);
+
+      tasksToAbort.forEach((task) => {
+        task.controller?.abort();
+      });
+    }
+  }
+
   public stop() {
     this.logger.info(`[worker] stopped`);
     this.poller.unset();

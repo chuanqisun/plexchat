@@ -6,10 +6,14 @@ import { getChatWorkers, type ChatEndpointManifest } from "./get-chat-workers";
 
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages"> & { models?: ModelName[] };
 
-export type SimpleEmbedProxy = (input: string[]) => Promise<{ embedding: number[] }[]>;
+export type SimpleEmbedProxy = (input: string[], context?: TaskContext) => Promise<{ embedding: number[] }[]>;
 
 export interface SimpleChatProxy {
-  (input: SimpleChatInput): Promise<ChatOutput>;
+  (input: SimpleChatInput, context?: TaskContext): Promise<ChatOutput>;
+}
+
+export interface TaskContext {
+  abortHandle?: string;
 }
 
 const defaultChatInput: ChatInput = {
@@ -33,7 +37,7 @@ export function plexchat(config: ProxiesConfig) {
     logLevel: config.logLevel ?? LogLevel.Error,
   });
 
-  const embedProxy: SimpleEmbedProxy = (texts: string[]) => {
+  const embedProxy: SimpleEmbedProxy = (texts: string[], context?: TaskContext) => {
     const tokenDemand = texts.map((str) => gptTokenzier.encode(str)).reduce((acc, cur) => acc + cur.length, 0);
 
     return manager
@@ -41,11 +45,14 @@ export function plexchat(config: ProxiesConfig) {
         tokenDemand,
         models: ["text-embedding-ada-002"],
         input: { input: texts },
+        context: {
+          abortHandle: context?.abortHandle,
+        },
       })
       .then((result) => result.data);
   };
 
-  const chatProxy: SimpleChatProxy = (input: SimpleChatInput) => {
+  const chatProxy: SimpleChatProxy = (input: SimpleChatInput, context?: TaskContext) => {
     const { models, ...standardInput } = input;
 
     const chatTokenDemand = gptTokenzier.encodeChat(input.messages, "gpt-3.5-turbo").length * 1.2;
@@ -59,12 +66,17 @@ export function plexchat(config: ProxiesConfig) {
         ...defaultChatInput,
         ...standardInput,
       },
+      context: {
+        abortHandle: context?.abortHandle,
+      },
     });
   };
 
   const abortAll = () => manager.abortAll();
+  const abort = (abortHandle: string) => manager.abort((task) => task.context?.abortHandle === abortHandle);
 
   return {
+    abort,
     abortAll,
     chatProxy,
     embedProxy,
