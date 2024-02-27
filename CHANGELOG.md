@@ -1,3 +1,7 @@
+# v0.5.2
+
+- Fixed: `content` can be `null`, rather than `undefined`
+
 # v0.5.1
 
 - Fixed: Missing `name` parameter on message
