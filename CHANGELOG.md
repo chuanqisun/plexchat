@@ -1,4 +1,4 @@
-# v0.4.2
+# v0.5.0
 
 - Added: Expose tool use API in preparation for function calling deprecation
 
