@@ -28,7 +28,7 @@ export type ToolChoiceDetails = {
 
 export interface ChatMessage {
   role: "assistant" | "system" | "user" | "tool" | "function";
-  content?: string;
+  content: string | null;
   name?: string;
   function_call?: FunctionCallRecord;
   tool_calls?: ToolCallRecord[];
