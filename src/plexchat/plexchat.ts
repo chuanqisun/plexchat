@@ -1,5 +1,5 @@
 import gptTokenzier from "gpt-tokenizer";
-import type { ChatInput, ChatModelName, ChatOutput, EmbedModelName } from "../openai/types";
+import type { ChatInput, ChatMessage, ChatModelName, ChatOutput, EmbedModelName } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager } from "../scheduler/manager";
 import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker";
@@ -54,7 +54,7 @@ export function plexchat(config: ProxiesConfig) {
   const chatProxy: SimpleChatProxy = (input, context) => {
     const { models, abortHandle } = context ?? {};
 
-    const chatTokenDemand = gptTokenzier.encodeChat(input.messages, "gpt-3.5-turbo").length * 1.2;
+    const chatTokenDemand = gptTokenzier.encodeChat(normalizeMessages(input.messages), "gpt-3.5-turbo").length * 1.2;
     const functionCallTokenDemand = input.functions ? gptTokenzier.encode(JSON.stringify(input.functions)).length * 1.2 : 0;
     const responseTokenDemand = input.max_tokens ?? defaultChatInput.max_tokens;
 
@@ -78,4 +78,12 @@ export function plexchat(config: ProxiesConfig) {
     chatProxy,
     embedProxy,
   };
+}
+
+/** convert function call message to assistant message */
+function normalizeMessages(chatMessage: ChatMessage[]) {
+  return chatMessage.map((message) => ({
+    role: message.role === "tool" || message.role === "function" ? "assistant" : message.role,
+    content: message.role === "tool" || message.role === "function" ? JSON.stringify(message.function_call ?? message.tool_calls) : message.content,
+  }));
 }

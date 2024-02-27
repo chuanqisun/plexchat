@@ -1,3 +1,7 @@
+# v0.4.2
+
+- Added: Expose tool use API in preparation for function calling deprecation
+
 # v0.4.1
 
 - Added: Consistent typing for input params

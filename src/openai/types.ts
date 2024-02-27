@@ -1,9 +1,14 @@
 // schema: https://github.com/Azure/azure-rest-api-specs/blob/main/specification/cognitiveservices/data-plane/AzureOpenAI/inference/readme.md
+
 // doc: https://learn.microsoft.com/en-us/azure/cognitive-services/openai/reference
 export interface ChatInput {
   messages: ChatMessage[];
+  /** @deprecate use tools instead */
   functions?: FunctionDefinition[];
+  /** @deprecate use tool_cohice instead */
   function_call?: FunctionCallRequest;
+  tools?: string;
+  tool_choice?: string | ToolChoiceDetails;
   temperature: number;
   top_p: number;
   frequency_penalty: number;
@@ -14,10 +19,24 @@ export interface ChatInput {
 
 export type FunctionCallRequest = "auto" | "none" | { name: string };
 
+export type ToolChoiceDetails = {
+  type: "function";
+  function: {
+    name: string;
+  };
+};
+
 export interface ChatMessage {
-  role: "assistant" | "system" | "user";
+  role: "assistant" | "system" | "user" | "tool" | "function";
   content: string; // FIXME: blank when content_filter or function_call is active
   function_call?: FunctionCallRecord;
+  tool_calls?: ToolCallRecord[];
+}
+
+export interface ToolCallRecord {
+  id: string;
+  type: "function";
+  function: FunctionCallRecord;
 }
 
 export interface FunctionCallRecord {
