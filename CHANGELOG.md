@@ -1,3 +1,8 @@
+# v0.5.1
+
+- Fixed: Missing `name` parameter on message
+- Fixed: `content` should be optional
+
 # v0.5.0
 
 - Added: Expose tool use API in preparation for function calling deprecation

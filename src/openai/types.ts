@@ -28,7 +28,8 @@ export type ToolChoiceDetails = {
 
 export interface ChatMessage {
   role: "assistant" | "system" | "user" | "tool" | "function";
-  content: string; // FIXME: blank when content_filter or function_call is active
+  content?: string;
+  name?: string;
   function_call?: FunctionCallRecord;
   tool_calls?: ToolCallRecord[];
 }
