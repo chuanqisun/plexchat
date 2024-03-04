@@ -1,3 +1,7 @@
+# v0.6.1
+
+- Changed: default api version at `2024-02-15-preview`
+
 # v0.6.0
 
 - Fixed: tools API typing
