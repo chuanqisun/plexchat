@@ -84,6 +84,6 @@ export function plexchat(config: ProxiesConfig) {
 function normalizeMessages(chatMessage: ChatMessage[]) {
   return chatMessage.map((message) => ({
     role: message.role === "tool" || message.role === "function" ? "assistant" : message.role,
-    content: message.role === "tool" || message.role === "function" ? JSON.stringify(message.function_call ?? message.tool_calls) : message.content,
+    content: message.role === "tool" || message.role === "function" ? JSON.stringify(message.function_call ?? message.tool_calls) : message.content!,
   }));
 }

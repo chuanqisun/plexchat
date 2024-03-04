@@ -3,46 +3,26 @@
 // doc: https://learn.microsoft.com/en-us/azure/cognitive-services/openai/reference
 export interface ChatInput {
   messages: ChatMessage[];
-  /** @deprecate use tools instead */
-  functions?: FunctionDefinition[];
-  /** @deprecate use tool_cohice instead */
-  function_call?: FunctionCallRequest;
-  tools?: string;
-  tool_choice?: string | ToolChoiceDetails;
+  tools?: ChatCompletionTool[];
+  tool_choice?: ChatCompletionToolChoice;
   temperature: number;
   top_p: number;
   frequency_penalty: number;
   presence_penalty: number;
   max_tokens: number;
   stop: null | string | string[];
+
+  /** @deprecate use `tools` instead */
+  functions?: FunctionDefinition[];
+  /** @deprecate use `tool_cohice` instead */
+  function_call?: FunctionCallRequest;
 }
 
 export type FunctionCallRequest = "auto" | "none" | { name: string };
 
-export type ToolChoiceDetails = {
+export interface ChatCompletionTool {
   type: "function";
-  function: {
-    name: string;
-  };
-};
-
-export interface ChatMessage {
-  role: "assistant" | "system" | "user" | "tool" | "function";
-  content: string | null;
-  name?: string;
-  function_call?: FunctionCallRecord;
-  tool_calls?: ToolCallRecord[];
-}
-
-export interface ToolCallRecord {
-  id: string;
-  type: "function";
-  function: FunctionCallRecord;
-}
-
-export interface FunctionCallRecord {
-  name: string;
-  arguments: string;
+  function: FunctionDefinition;
 }
 
 export interface FunctionDefinition {
@@ -50,6 +30,22 @@ export interface FunctionDefinition {
   description?: string;
   parameters: any;
 }
+
+export type ChatCompletionToolChoice = "none" | "auto" | ChatCompletionNamedToolChoice;
+
+export interface ChatCompletionNamedToolChoice {
+  type: "function";
+  function: {
+    name: string;
+  };
+}
+
+export type ToolChoiceDetails = {
+  type: "function";
+  function: {
+    name: string;
+  };
+};
 
 export type ChatOutput = {
   choices: {
@@ -63,6 +59,26 @@ export type ChatOutput = {
     total_tokens: number;
   };
 };
+
+export interface ChatMessage {
+  role: "assistant" | "system" | "user" | "tool" | "function";
+  content: string | null;
+  name?: string;
+  tool_calls?: ChatCompletionMessageToolCall[];
+  /** @deprecated use `tool_calls` instead */
+  function_call?: ChatCompletionMeesageToolCallFunction;
+}
+
+export interface ChatCompletionMessageToolCall {
+  id: string;
+  type: "function";
+  function: ChatCompletionMeesageToolCallFunction;
+}
+
+export interface ChatCompletionMeesageToolCallFunction {
+  name: string;
+  arguments: string;
+}
 
 export type ChatModelName = "gpt-35-turbo" | "gpt-35-turbo-16k" | "gpt-4" | "gpt-4-32k";
 export type EmbedModelName = "text-embedding-ada-002";

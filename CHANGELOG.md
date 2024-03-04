@@ -1,3 +1,7 @@
+# v0.6.0
+
+- Fixed: tools API typing
+
 # v0.5.2
 
 - Fixed: `content` can be `null`, rather than `undefined`
