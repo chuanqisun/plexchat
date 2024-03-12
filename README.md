@@ -1,6 +1,13 @@
 # Plexchat
 
-High throughput Azure OpenAI Chat Client, consists of the following components:
+High throughput Azure OpenAI Chat Client.
+
+- Compatible with Azure Open AI chat and embedding API
+- Instantiate one worker per API endpoint, with endpoint specific rate and token limit
+- Customizable tokenzier for either estimated (fast) or precise (slow) token length control
+- Built-in retry based on HTTP header and heuristics
+- Built-in queue for burst of traffic
+
 
 ## Get started
 
@@ -75,6 +82,22 @@ chatProxy({
 embedProxy(["Hello world", "Fizz buzz"]);
 ```
 
+## How does it work
+
+We instantiate one worker for each endpoint. The worker keeps track of its capacity based on the token and rate limit of the endpoint as well as its current workload.
+
+The worker is started by the manager. Once it's started, it polls the manager for tasks. The worker automatically goes to sleep when all tasks are finished and must be started again by the manager when new tasks are available.
+
+The manager dispatch
+
 ## Limitations
 
-Only support **TypeScript** bundlers (e.g. vite, esbuild). Vanilla js is not distributed in the package
+- Only support **TypeScript** bundlers (e.g. vite, esbuild). Vanilla js is not distributed in the package
+
+## Future work
+
+- Customizable prioritization rules for the task queue
+- Server-sent events (SSE) for chat response
+- HTTP based remote workers
+- Docker-deployable HTTP server
+- Automatic rate limit detection by Azure Open AI admin API
