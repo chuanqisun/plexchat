@@ -84,11 +84,22 @@ embedProxy(["Hello world", "Fizz buzz"]);
 
 ## How does it work
 
-We instantiate one worker for each endpoint. The worker keeps track of its capacity based on the token and rate limit of the endpoint as well as its current workload.
+We instantiate one worker for each endpoint. The worker polls the manager for task with its current capacity. The capacity is based on:
+1. Token limit
+2. Rate limit
+3. Past consumption
 
-The worker is started by the manager. Once it's started, it polls the manager for tasks. The worker automatically goes to sleep when all tasks are finished and must be started again by the manager when new tasks are available.
+The manager uses a queue to track user requests. Each user request is decorated with metadata about its demand:
+1. Prompt token consumption
+2. Max response token limit
+3. Model compatibility
 
-The manager dispatch
+The manager dispatches the task to the first polling worker that has a capacity that meets or exceeds the demand. When the worker finishes the task, the result is returned to the user. When the worker fails the task, the task is requeued until all retries are used up.
+
+### Polling convention
+
+- Manager wakes up workers upon receiving every new task
+- Worker polls indefinitely, and goes to sleep after they received at least one task and finished all assigned tasks.
 
 ## Limitations
 
