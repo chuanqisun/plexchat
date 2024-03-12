@@ -84,17 +84,20 @@ embedProxy(["Hello world", "Fizz buzz"]);
 
 ## How does it work
 
-We instantiate one worker for each endpoint. The worker polls the manager for task with its current capacity. The capacity is based on:
+We instantiate one [worker](https://github.com/chuanqisun/plexchat/blob/master/src/scheduler/worker.ts) for each endpoint. The worker polls the manager for task with its current capacity. The capacity is based on:
 1. Token limit
 2. Rate limit
 3. Past consumption
 
-The manager uses a queue to track user requests. Each user request is decorated with metadata about its demand:
+The [manager](https://github.com/chuanqisun/plexchat/blob/master/src/scheduler/manager.ts) uses a queue to track user requests. Each user request is decorated with metadata about its demand:
 1. Prompt token consumption
 2. Max response token limit
 3. Model compatibility
 
 The manager dispatches the task to the first polling worker that has a capacity that meets or exceeds the demand. When the worker finishes the task, the result is returned to the user. When the worker fails the task, the task is requeued until all retries are used up.
+
+For user convenience, we provide [a factory to instantiate the manager](https://github.com/chuanqisun/plexchat/blob/master/src/plexchat/plexchat.ts) as Azure Open AI embed and chat proxies. We also provide [a factory to instantiate the worker](https://github.com/chuanqisun/plexchat/blob/master/src/plexchat/plexchat-worker.ts) against Azure Open AI specific endpoints
+
 
 ### Polling convention
 
