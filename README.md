@@ -2,9 +2,6 @@
 
 High throughput Azure OpenAI Chat Client, consists of the following components:
 
-**Worker manager**: Broadcast new tasks to the workers
-**Worker**: Request task from manager based on available capacity
-
 ## Get started
 
 Install
