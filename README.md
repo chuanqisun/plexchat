@@ -84,7 +84,7 @@ embedProxy(["Hello world", "Fizz buzz"]);
 
 ## How does it work
 
-We instantiate one [worker](https://github.com/chuanqisun/plexchat/blob/master/src/scheduler/worker.ts) for each endpoint. The worker polls the manager for task with its current capacity. The capacity is based on:
+We instantiate one [worker](https://github.com/chuanqisun/plexchat/blob/master/src/scheduler/worker.ts) for each endpoint. The worker polls the manager for task by announcing its current capacity. The capacity is based on:
 1. Token limit
 2. Rate limit
 3. Past consumption
