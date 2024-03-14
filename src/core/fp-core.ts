@@ -1,4 +1,4 @@
-import { Observable, Subject, Subscription, combineLatest, distinctUntilChanged, filter, map, scan, takeWhile, tap } from "rxjs";
+import { Observable, Subject, Subscription, combineLatest, distinctUntilChanged, filter, interval, map, scan, takeWhile, tap } from "rxjs";
 
 interface TaskPoolEvent {
   added?: { id: number; data?: any };
@@ -26,6 +26,7 @@ interface Worker {
 function createScheduler() {
   const $taskPoolEvent = new Subject<TaskPoolEvent>();
   const $workerPoolEvent = new Subject<WorkerPoolEvent>();
+  const $heartBeat = interval(1000);
 
   let taskId = 0;
   let workerId = 0;
@@ -100,9 +101,12 @@ function createScheduler() {
       });
     });
 
+    const heartbeat = $heartBeat.subscribe();
+
     return {
       stop: () => {
         sub.unsubscribe();
+        heartbeat.unsubscribe();
       },
     };
   }
@@ -154,25 +158,29 @@ function createScheduler() {
 
 // test run
 const scheduler = createScheduler();
-scheduler.start();
-scheduler.addWorker({
-  run: (task: Task) => {
-    return new Observable((subscriber) => {
-      setTimeout(() => {
-        subscriber.next(`${task.id} step 1`);
-      }, Math.random() * 1000);
-      setTimeout(() => {
-        subscriber.next(`${task.id} step 2`);
-      }, 1000 + Math.random() * 1000);
-      setTimeout(() => {
-        subscriber.next(`${task.id} step 3`);
-        subscriber.complete();
-      }, 2000);
-    });
-  },
-});
+const { stop } = scheduler.start();
+// scheduler.addWorker({
+//   run: (task: Task) => {
+//     return new Observable((subscriber) => {
+//       setTimeout(() => {
+//         subscriber.next(`${task.id} step 1`);
+//       }, Math.random() * 1000);
+//       setTimeout(() => {
+//         subscriber.next(`${task.id} step 2`);
+//       }, 1000 + Math.random() * 1000);
+//       setTimeout(() => {
+//         subscriber.next(`${task.id} step 3`);
+//         subscriber.complete();
+//       }, 2000);
+//     });
+//   },
+// });
 
 scheduler.addTask({ data: "task 1" }).subscribe();
 scheduler.addTask({ data: "task 2" }).subscribe();
 scheduler.addTask({ data: "task 3" }).subscribe();
 scheduler.addTask({ data: "task 4" }).subscribe();
+
+setTimeout(() => {
+  stop();
+}, 5000);
