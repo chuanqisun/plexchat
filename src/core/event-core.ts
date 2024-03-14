@@ -1,6 +1,6 @@
-import { Observable, Subject, Subscription, filter, interval, map, merge, mergeMap, takeUntil, tap } from "rxjs";
+import { Observable, Subject, Subscription, combineLatest, delay, filter, interval, map, merge, mergeMap, scan, startWith, take, takeUntil, tap } from "rxjs";
 
-interface TaskChange {
+interface TaskEvent {
   type: "added" | "started" | "updated" | "completed" | "cancelled";
   handle: TaskHandle;
 }
@@ -11,41 +11,41 @@ interface TaskHandle {
 }
 
 interface WorkerConfig {
-  run(task: any, onCapacityEvent: (capacityEvent: any) => any): Observable<TaskChange>; // TODO hide system types
+  run(task: any, onCapacityEvent: (capacityEvent: any) => any): Observable<TaskEvent>; // TODO hide system types
   onCapacityScan($capacityEvent: Observable<any>): Observable<any>; // TODO non-numeric capacity
   onCapacityEventExpire(capacityEvent: any): boolean; // TODO GC out of date capacity records
 }
 
-function createScheduler() {
+export function createScheduler() {
   const $heartbeat = interval(1000);
-  const $taskUpdates = new Subject<TaskChange>();
-  const $taskAnnouncement = $taskUpdates.pipe(
-    filter((change) => change.type === "added"),
-    map((change) => change.handle.task)
+  const $taskEvent = new Subject<TaskEvent>();
+  const $taskAnnouncement = $taskEvent.pipe(
+    filter((event) => event.type === "added"),
+    map((event) => event.handle.task)
   );
 
-  const $taskCancellation = $taskUpdates.pipe(
-    filter((change) => change.type === "cancelled"),
-    map((change) => change.handle)
+  const $taskCancellation = $taskEvent.pipe(
+    filter((event) => event.type === "cancelled"),
+    map((event) => event.handle)
   );
 
   let taskId = 0;
   const taskPool = new Map<number, TaskHandle>();
 
-  function submit(task: any): Observable<TaskChange> {
+  function submit(task: any): Observable<TaskEvent> {
     return new Observable((subscriber) => {
       start();
 
       const id = taskId++;
-      const subscription = $taskUpdates.pipe(filter((taskChange) => taskChange.handle.id === id)).subscribe(subscriber);
+      const subscription = $taskEvent.pipe(filter((taskEvent) => taskEvent.handle.id === id)).subscribe(subscriber);
       const handle: TaskHandle = { id, task };
       taskPool.set(id, handle);
-      $taskUpdates.next({ type: "added", handle });
+      $taskEvent.next({ type: "added", handle });
 
       return () => {
         console.log(`[scheduler] task cancelled`);
         taskPool.delete(id);
-        $taskUpdates.next({ type: "cancelled", handle });
+        $taskEvent.next({ type: "cancelled", handle });
         subscription.unsubscribe();
       };
     });
@@ -64,7 +64,7 @@ function createScheduler() {
 
   function retryTask(task: TaskHandle) {
     taskPool.set(task.id, task);
-    $taskUpdates.next({ type: "added", handle: task });
+    $taskEvent.next({ type: "added", handle: task });
   }
 
   function addWorker(config?: WorkerConfig) {
@@ -81,7 +81,7 @@ function createScheduler() {
 
         const $taskV2 = config?.run(handle.task, (capacityChange) => $capacityChange.next(capacityChange));
 
-        const $task = new Observable<TaskChange>((subscriber) => {
+        const $task = new Observable<TaskEvent>((subscriber) => {
           $capacityChange.next("capacity reduced");
           subscriber.next({ type: "started", handle });
           const cancel1 = setTimeout(() => {
@@ -102,7 +102,7 @@ function createScheduler() {
 
         return $task.pipe(takeUntil($cancelSignal));
       }),
-      tap((taskChange) => $taskUpdates.next(taskChange))
+      tap((taskEvent) => $taskEvent.next(taskEvent))
     );
   }
 
@@ -111,7 +111,7 @@ function createScheduler() {
   function start() {
     console.log(`[scheduler] started`);
     if (schedulerSubscription) return;
-    schedulerSubscription = merge($taskUpdates, $heartbeat).subscribe();
+    schedulerSubscription = merge($taskEvent, $heartbeat).subscribe();
   }
 
   function stop() {
@@ -131,21 +131,77 @@ function createScheduler() {
   };
 }
 
-const { stop, submit, addWorker } = createScheduler();
+// const { stop, submit, addWorker } = createScheduler();
 
-const worker1 = addWorker();
-const worker2 = addWorker();
-const work1Subscription = worker1.subscribe((we) => console.log(`[worker 1]`, JSON.stringify(we)));
-const work2Subscription = worker2.subscribe((we) => console.log(`[worker 2]`, JSON.stringify(we)));
+// const worker1 = addWorker();
+// const worker2 = addWorker();
+// const work1Subscription = worker1.subscribe((we) => console.log(`[worker 1]`, JSON.stringify(we)));
+// const work2Subscription = worker2.subscribe((we) => console.log(`[worker 2]`, JSON.stringify(we)));
 
-const task1Sub = submit("task 1").subscribe();
-const task2Sub = submit("task 2").subscribe();
+// const task1Sub = submit("task 1").subscribe();
+// const task2Sub = submit("task 2").subscribe();
 
-// simulate abortion
-setTimeout(() => task1Sub.unsubscribe(), 500);
+// // simulate abortion
+// setTimeout(() => task1Sub.unsubscribe(), 500);
 
-setTimeout(() => {
-  stop();
-  work1Subscription.unsubscribe();
-  work2Subscription.unsubscribe();
-}, 5000);
+// setTimeout(() => {
+//   stop();
+//   work1Subscription.unsubscribe();
+//   work2Subscription.unsubscribe();
+// }, 5000);
+
+interface WorkerEvent {
+  type: "taskAquired" | "taskCompleted";
+  handle: TaskHandle;
+}
+
+// test worker harness
+function createWorker() {
+  const $workerEvents = new Subject<WorkerEvent>();
+  const $consumptionRecords = new Subject<any>();
+
+  const $reqUsed1s = $consumptionRecords.pipe(map(() => 1));
+  const $reqRecovered1s = $consumptionRecords.pipe(
+    delay(1_000),
+    map(() => -1)
+  );
+  const $consumptionBalance1s = merge($reqUsed1s, $reqRecovered1s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
+
+  const $reqUsed10s = $consumptionRecords.pipe(map(() => 1));
+  const $reqRecovered10s = $consumptionRecords.pipe(
+    delay(10_000),
+    map(() => -1)
+  );
+  const $consumptionBalance10s = merge($reqUsed10s, $reqRecovered10s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
+
+  const sum = (acc: number, value: number) => acc + value;
+
+  const $60rpmIn10sec = $consumptionBalance10s.pipe(
+    map((count) => ({ reqUsedIn10s: count.reduce(sum, 0) })),
+    startWith({ rpm10sCapacity: 0 })
+  );
+
+  const $60rmIn3sec = $consumptionBalance1s.pipe(
+    map((count) => ({ reqUsedIn3s: count.reduce(sum, 0) })),
+    startWith({ reqUsedIn3s: 0 })
+  );
+
+  const allConstraints = [$60rmIn3sec, $60rpmIn10sec];
+
+  const $capacity = combineLatest(allConstraints).pipe(map((contraints) => Object.fromEntries(contraints.flatMap(Object.entries))));
+
+  return {
+    $consumptionRecords,
+    $capacity,
+  };
+}
+
+const worker = createWorker();
+worker.$capacity.subscribe((cap) => console.log(`[cap]`, JSON.stringify(cap)));
+setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 100);
+setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 200);
+setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 1500);
+setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 1600);
+
+const heartbeat = interval(1000).pipe(take(5)).subscribe();
+// 5 sec to kill
