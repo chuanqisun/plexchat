@@ -162,42 +162,42 @@ function createWorker() {
 
   const $reqUsed1s = $consumptionRecords.pipe(map(() => 1));
   const $reqRecovered1s = $consumptionRecords.pipe(
-    delay(1_000),
+    delay(3_000),
     map(() => -1)
   );
-  const $consumptionBalance1s = merge($reqUsed1s, $reqRecovered1s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
+  const $reqBalance3s = merge($reqUsed1s, $reqRecovered1s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
 
   const $reqUsed10s = $consumptionRecords.pipe(map(() => 1));
   const $reqRecovered10s = $consumptionRecords.pipe(
     delay(10_000),
     map(() => -1)
   );
-  const $consumptionBalance10s = merge($reqUsed10s, $reqRecovered10s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
+  const $reqBalance10s = merge($reqUsed10s, $reqRecovered10s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
 
   const sum = (acc: number, value: number) => acc + value;
 
-  const $60rpmIn10sec = $consumptionBalance10s.pipe(
-    map((count) => ({ reqUsedIn10s: count.reduce(sum, 0) })),
-    startWith({ rpm10sCapacity: 0 })
+  const $usageMetric1 = $reqBalance10s.pipe(
+    map((count) => ({ reqUsed10s: count.reduce(sum, 0) })),
+    startWith({ reqUsed10s: 0 })
   );
 
-  const $60rmIn3sec = $consumptionBalance1s.pipe(
-    map((count) => ({ reqUsedIn3s: count.reduce(sum, 0) })),
-    startWith({ reqUsedIn3s: 0 })
+  const $usageMetric2 = $reqBalance3s.pipe(
+    map((count) => ({ reqUsed3s: count.reduce(sum, 0) })),
+    startWith({ reqUsed3s: 0 })
   );
 
-  const allConstraints = [$60rmIn3sec, $60rpmIn10sec];
+  const allUsageMetrics = [$usageMetric2, $usageMetric1];
 
-  const $capacity = combineLatest(allConstraints).pipe(map((contraints) => Object.fromEntries(contraints.flatMap(Object.entries))));
+  const $usage = combineLatest(allUsageMetrics).pipe(map((contraints) => Object.fromEntries(contraints.flatMap(Object.entries))));
 
   return {
     $consumptionRecords,
-    $capacity,
+    $usage,
   };
 }
 
 const worker = createWorker();
-worker.$capacity.subscribe((cap) => console.log(`[cap]`, JSON.stringify(cap)));
+worker.$usage.subscribe((cap) => console.log(`[cap]`, JSON.stringify(cap)));
 setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 100);
 setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 200);
 setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 1500);
