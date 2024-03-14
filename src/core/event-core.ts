@@ -68,50 +68,42 @@ function createScheduler() {
   }
 
   function addWorker(config?: WorkerConfig) {
-    return new Observable((subscriber) => {
-      const $heartbeat = interval(1000); // TODO replace with time based capacity change
+    const $heartbeat = interval(1000); // TODO replace with time based capacity change
 
-      const $capacityChange = new Subject<any>();
-      const $capacity = config?.onCapacityScan($capacityChange);
+    const $capacityChange = new Subject<any>();
+    const $capacity = $capacityChange.pipe();
 
-      const subscription = merge($taskAnnouncement, $capacityChange, $heartbeat)
-        .pipe(
-          map(() => requestTask(1)),
-          filter(isNotNull),
-          mergeMap((handle) => {
-            const $cancelSignal = $taskCancellation.pipe(filter((cancelTask) => cancelTask.id === handle.id));
+    return merge($taskAnnouncement, $capacityChange, $heartbeat).pipe(
+      map(() => requestTask(1)),
+      filter(isNotNull),
+      mergeMap((handle) => {
+        const $cancelSignal = $taskCancellation.pipe(filter((cancelTask) => cancelTask.id === handle.id));
 
-            const $taskV2 = config?.run(handle.task, (capacityChange) => $capacityChange.next(capacityChange));
+        const $taskV2 = config?.run(handle.task, (capacityChange) => $capacityChange.next(capacityChange));
 
-            const $task = new Observable<TaskChange>((subscriber) => {
-              $capacityChange.next("capacity reduced");
-              subscriber.next({ type: "started", handle });
-              const cancel1 = setTimeout(() => {
-                subscriber.next({ type: "updated", handle });
-              }, 1000);
-              const cancel2 = setTimeout(() => {
-                subscriber.next({ type: "completed", handle });
-                subscriber.complete();
-                $capacityChange.next("capacity increased");
-              }, 2000);
+        const $task = new Observable<TaskChange>((subscriber) => {
+          $capacityChange.next("capacity reduced");
+          subscriber.next({ type: "started", handle });
+          const cancel1 = setTimeout(() => {
+            subscriber.next({ type: "updated", handle });
+          }, 1000);
+          const cancel2 = setTimeout(() => {
+            subscriber.next({ type: "completed", handle });
+            subscriber.complete();
+            $capacityChange.next("capacity increased");
+          }, 2000);
 
-              return () => {
-                console.log(`[scheduler] task stopped`);
-                clearTimeout(cancel1);
-                clearTimeout(cancel2);
-              };
-            });
+          return () => {
+            console.log(`[scheduler] task stopped`);
+            clearTimeout(cancel1);
+            clearTimeout(cancel2);
+          };
+        });
 
-            return $task.pipe(takeUntil($cancelSignal));
-          }),
-          tap((taskChange) => $taskUpdates.next(taskChange))
-        )
-        .subscribe(subscriber);
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    });
+        return $task.pipe(takeUntil($cancelSignal));
+      }),
+      tap((taskChange) => $taskUpdates.next(taskChange))
+    );
   }
 
   let schedulerSubscription: Subscription | null;
