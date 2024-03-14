@@ -1,4 +1,4 @@
-import { Observable, Subject, filter, interval, map, merge, mergeMap, mergeWith, tap } from "rxjs";
+import { Observable, Subject, filter, interval, map, merge, mergeMap, mergeWith, takeUntil, tap } from "rxjs";
 
 interface TaskChange {
   type: "added" | "started" | "updated" | "completed" | "cancelled";
@@ -8,7 +8,6 @@ interface TaskChange {
 interface TaskHandle {
   id: number;
   task: any;
-  abortController: AbortController;
 }
 
 const $heartbeat = interval(1000);
@@ -18,18 +17,25 @@ const $taskAnnouncement = $taskUpdates.pipe(
   map((change) => change.handle.task)
 );
 
+const $taskCancellation = $taskUpdates.pipe(
+  filter((change) => change.type === "cancelled"),
+  map((change) => change.handle)
+);
+
 let taskId = 0;
 const taskPool = new Map<number, TaskHandle>();
 function submit(task: any): Observable<TaskChange> {
   return new Observable((subscriber) => {
     const id = taskId++;
-    const abortController = new AbortController();
     const subscription = $taskUpdates.pipe(filter((taskChange) => taskChange.handle.id === id)).subscribe(subscriber);
-    const handle: TaskHandle = { id, task, abortController };
+    const handle: TaskHandle = { id, task };
     taskPool.set(id, handle);
     $taskUpdates.next({ type: "added", handle });
 
     return () => {
+      console.log(`[task] did cancel`);
+      taskPool.delete(id);
+      $taskUpdates.next({ type: "cancelled", handle });
       subscription.unsubscribe();
     };
   });
@@ -38,7 +44,7 @@ function submit(task: any): Observable<TaskChange> {
 function requestTask(capacity: any): TaskHandle | null {
   // naive scheduling
   const next = taskPool.values().next();
-  if (next.value && Math.random() > 0.8) {
+  if (next.value) {
     taskPool.delete((next.value as TaskHandle).id);
     return next.value;
   } else {
@@ -63,19 +69,28 @@ function addWorker() {
         map(() => requestTask(1)),
         filter((task) => task !== null),
         mergeMap((task) => {
-          // run the task
-          return new Observable<TaskChange>((subscriber) => {
+          const $cancelSignal = $taskCancellation.pipe(filter((cancelTask) => cancelTask.id === task!.id));
+
+          const $task = new Observable<TaskChange>((subscriber) => {
             $consumerChange.next("capacity reduced");
             subscriber.next({ type: "started", handle: task! });
-            setTimeout(() => {
+            const cancel1 = setTimeout(() => {
               subscriber.next({ type: "updated", handle: task! });
             }, 1000);
-            setTimeout(() => {
+            const cancel2 = setTimeout(() => {
               subscriber.next({ type: "completed", handle: task! });
               subscriber.complete();
               $consumerChange.next("capacity increased");
             }, 2000);
+
+            return () => {
+              console.log(`[worker] did cancel`);
+              clearTimeout(cancel1);
+              clearTimeout(cancel2);
+            };
           });
+
+          return $task.pipe(takeUntil($cancelSignal));
         }),
         tap((taskChange) => $taskUpdates.next(taskChange))
       )
@@ -98,11 +113,10 @@ const worker2 = addWorker();
 const work1Subscription = worker1.subscribe((we) => console.log(`[worker 1]`, JSON.stringify(we)));
 const work2Subscription = worker2.subscribe((we) => console.log(`[worker 2]`, JSON.stringify(we)));
 
-submit("task 1").subscribe();
-submit("task 2").subscribe();
-submit("task 3").subscribe();
-submit("task 4").subscribe();
-submit("task 5").subscribe();
+const task1Sub = submit("task 1").subscribe();
+
+// simulate abortion
+setTimeout(() => task1Sub.unsubscribe(), 1500);
 
 setTimeout(() => {
   console.log("timeout exit");
