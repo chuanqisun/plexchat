@@ -120,18 +120,29 @@ export function createScheduler() {
     console.log(`[scheduler] stopped`);
   }
 
-  function isNotNull<T>(value: T | null): value is T {
-    return value !== null;
+  function addWorkerV2(worker: Worker) {
+    return worker.$usage.pipe(
+      map((usage) => requestTask(usage)),
+      filter(isNotNull),
+      mergeMap((handle) => {
+        const $cancelSignal = $taskCancellation.pipe(filter((cancelTask) => cancelTask.id === handle.id));
+        const $task = worker.startTask(handle.task);
+        return $task.pipe(takeUntil($cancelSignal));
+      }),
+      tap((taskEvent) => $taskEvent.next(taskEvent))
+    );
   }
 
   return {
     addWorker,
+    addWorkerV2,
+    requestTask,
     submit,
     stop,
   };
 }
 
-// const { stop, submit, addWorker } = createScheduler();
+const { stop, submit, addWorker, addWorkerV2, requestTask } = createScheduler();
 
 // const worker1 = addWorker();
 // const worker2 = addWorker();
@@ -151,13 +162,21 @@ export function createScheduler() {
 // }, 5000);
 
 interface WorkerEvent {
-  type: "taskAquired" | "taskCompleted";
+  type: "taskAquired" | "taskChanged" | "taskCompleted";
   handle: TaskHandle;
 }
 
-// test worker harness
+interface Worker {
+  startTask: (task: TaskHandle) => Observable<any>;
+  $consumptionRecords: Observable<any>;
+  $usage: Observable<any>;
+  $taskEvents: Observable<any>;
+}
+
+// TODO: generalize usage metrics
+// TODO: apply task execution logic
 function createWorker() {
-  const $workerEvents = new Subject<WorkerEvent>();
+  const $taskEvents = new Subject<WorkerEvent>();
   const $consumptionRecords = new Subject<any>();
 
   const $reqUsed1s = $consumptionRecords.pipe(map(() => 1));
@@ -190,9 +209,16 @@ function createWorker() {
 
   const $usage = combineLatest(allUsageMetrics).pipe(map((contraints) => Object.fromEntries(contraints.flatMap(Object.entries))));
 
+  function startTask(task: any): Observable<any> {
+    // TBD inject logic
+    return new Observable();
+  }
+
   return {
+    startTask,
     $consumptionRecords,
     $usage,
+    $taskEvents,
   };
 }
 
@@ -205,3 +231,15 @@ setTimeout(() => worker.$consumptionRecords.next({ timestamp: Date.now() }), 160
 
 const heartbeat = interval(1000).pipe(take(5)).subscribe();
 // 5 sec to kill
+
+// proposed protocol, to be wrapped in the scheduler?
+const liveWorker = createWorker();
+liveWorker.$usage.pipe(
+  map((usage) => requestTask(usage)),
+  filter(isNotNull),
+  tap(liveWorker.startTask)
+);
+
+function isNotNull<T>(value: T | null): value is T {
+  return value !== null;
+}
