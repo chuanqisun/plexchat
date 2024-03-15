@@ -78,7 +78,7 @@ export function createScheduler() {
   function addWorker(worker: Worker) {
     return combineLatest([$taskAnnouncement, worker.$usage]).pipe(
       tap(() => console.log("will request task")),
-      map(([_announceMent, usage]) => requestTask(usage)),
+      map(([_annoucement, usage]) => requestTask(usage)),
       filter(isNotNull),
       mergeMap((handle) => {
         const $cancelSignal = $taskCancellation.pipe(filter((cancelTask) => cancelTask.id === handle.id));
