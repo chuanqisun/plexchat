@@ -10,55 +10,81 @@ interface TaskHandle {
   task: any;
 }
 
-export function createScheduler() {
-  const $heartbeat = interval(1000);
+export function createTaskPool() {
   const $taskEvent = new Subject<TaskEvent>();
-  const $taskAnnouncement = $taskEvent.pipe(
-    filter((event) => event.type === "added"),
-    map((event) => event.handle.task)
-  );
-
-  const $taskCancellation = $taskEvent.pipe(
-    filter((event) => event.type === "cancelled"),
-    map((event) => event.handle)
-  );
-
-  let taskId = 0;
   const taskPool = new Map<number, TaskHandle>();
+  let taskId = 0;
 
-  function submit(task: any): Observable<TaskEvent> {
-    return new Observable((subscriber) => {
-      start();
-
-      const id = taskId++;
-      const subscription = $taskEvent.pipe(filter((taskEvent) => taskEvent.handle.id === id)).subscribe(subscriber);
-      const handle: TaskHandle = { id, task };
-      taskPool.set(id, handle);
-      $taskEvent.next({ type: "added", handle });
-
-      return () => {
-        console.log(`[scheduler] task cancelled`);
-        taskPool.delete(id);
-        $taskEvent.next({ type: "cancelled", handle });
-        subscription.unsubscribe();
-      };
-    });
+  function add(task: any): TaskHandle {
+    const id = taskId++;
+    console.log(`[pool] task added ${id}`);
+    const handle: TaskHandle = { id, task };
+    taskPool.set(id, handle);
+    $taskEvent.next({ type: "added", handle });
+    return handle;
   }
 
-  function requestTask(capacity: any): TaskHandle | null {
-    // naive scheduling
+  function cancel(handle: TaskHandle) {
+    console.log(`[pool] task cancelled ${handle.id}`);
+    taskPool.delete(handle.id);
+    $taskEvent.next({ type: "cancelled", handle });
+  }
+
+  function dispatch(usage: any): TaskHandle | null {
     const next = taskPool.values().next();
+    const handle = next.value as TaskHandle;
     if (next.value) {
-      taskPool.delete((next.value as TaskHandle).id);
+      console.log(`[pool] task dispatched ${handle.id}`);
+      $taskEvent.next({ type: "started", handle });
+      taskPool.delete(handle.id);
       return next.value;
     } else {
       return null;
     }
   }
 
+  return {
+    $taskEvent,
+    add,
+    cancel,
+    dispatch,
+  };
+}
+
+export function createScheduler() {
+  const $heartbeat = interval(1000);
+  const taskPool = createTaskPool();
+
+  const $taskAnnouncement = taskPool.$taskEvent.pipe(
+    filter((event) => event.type === "added"),
+    map((event) => event.handle.task)
+  );
+
+  const $taskCancellation = taskPool.$taskEvent.pipe(
+    filter((event) => event.type === "cancelled"),
+    map((event) => event.handle)
+  );
+
+  function submit(task: any): Observable<TaskEvent> {
+    return new Observable((subscriber) => {
+      start();
+
+      const handle = taskPool.add(task);
+      const subscription = taskPool.$taskEvent.pipe(filter((taskEvent) => taskEvent.handle.id === handle.id)).subscribe(subscriber);
+
+      return () => {
+        taskPool.cancel(handle);
+        subscription.unsubscribe();
+      };
+    });
+  }
+
+  function requestTask(capacity: any): TaskHandle | null {
+    return taskPool.dispatch(capacity);
+  }
+
   function retryTask(task: TaskHandle) {
-    taskPool.set(task.id, task);
-    $taskEvent.next({ type: "added", handle: task });
+    // TODO implement
   }
 
   let schedulerSubscription: Subscription | null;
@@ -66,7 +92,7 @@ export function createScheduler() {
   function start() {
     console.log(`[scheduler] started`);
     if (schedulerSubscription) return;
-    schedulerSubscription = merge($taskEvent, $heartbeat).subscribe();
+    schedulerSubscription = merge(taskPool.$taskEvent, $heartbeat).subscribe();
   }
 
   function stop() {
@@ -85,7 +111,7 @@ export function createScheduler() {
         const $task = worker.startTask(handle);
         return $task.pipe(takeUntil($cancelSignal));
       }),
-      tap((taskEvent) => $taskEvent.next(taskEvent))
+      tap((taskEvent) => taskPool.$taskEvent.next(taskEvent))
     );
   }
 
