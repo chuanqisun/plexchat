@@ -1,45 +1,32 @@
-// TODO: generalize usage metrics
-
-import { Observable, Subject, combineLatest, delay, map, merge, scan, startWith } from "rxjs";
-import type { TaskHandle, Worker, WorkerTaskEvent } from "./types";
+import { Observable, Subject, combineLatest, map, tap } from "rxjs";
+import type { IWorker, TaskHandle, WorkerTaskEvent } from "./types";
 
 // TODO: apply task execution logic
-export function createWorker(): Worker {
+
+type ObservableFactory<T> = (...args: any[]) => Observable<T>;
+type TypeOfObservableMerge<T extends ObservableFactory<any>[]> = T extends [ObservableFactory<infer U>, ...infer Rest]
+  ? Rest extends ObservableFactory<any>[]
+    ? Merge<U, TypeOfObservableMerge<Rest>>
+    : Rest extends ObservableFactory<infer Q>
+    ? Q
+    : {}
+  : {};
+type Merge<A, B> = { [K in keyof A | keyof B]: K extends keyof B ? B[K] : K extends keyof A ? A[K] : never };
+
+export function createWorker(options: { policies: ObservableFactory<any>[] }): IWorker {
+  const { policies } = options;
   const $consumptionRecords = new Subject<any>();
 
-  const $reqUsed1s = $consumptionRecords.pipe(map(() => 1));
-  const $reqRecovered1s = $consumptionRecords.pipe(
-    delay(3_000),
-    map(() => -1)
-  );
-  const $reqBalance3s = merge($reqUsed1s, $reqRecovered1s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
-
-  const $reqUsed10s = $consumptionRecords.pipe(map(() => 1));
-  const $reqRecovered10s = $consumptionRecords.pipe(
-    delay(10_000),
-    map(() => -1)
-  );
-  const $reqBalance10s = merge($reqUsed10s, $reqRecovered10s).pipe(scan((acc, value) => [...acc, value], [] as number[]));
-
-  const sum = (acc: number, value: number) => acc + value;
-
-  const $usageMetric1 = $reqBalance10s.pipe(
-    map((count) => ({ reqUsed10s: count.reduce(sum, 0) })),
-    startWith({ reqUsed10s: 0 })
-  );
-
-  const $usageMetric2 = $reqBalance3s.pipe(
-    map((count) => ({ reqUsed3s: count.reduce(sum, 0) })),
-    startWith({ reqUsed3s: 0 })
-  );
-
-  const allUsageMetrics = [$usageMetric2, $usageMetric1];
-
-  const $usage = combineLatest(allUsageMetrics).pipe(map((contraints) => Object.fromEntries(contraints.flatMap(Object.entries))));
+  const $usage = combineLatest(policies.map((policy) => policy($consumptionRecords))).pipe(
+    map((contraints) => Object.fromEntries(contraints.flatMap(Object.entries))),
+    tap((usage) => console.log(`[worker] usage`, JSON.stringify(usage)))
+  ) as Observable<any>;
 
   function startTask(task: TaskHandle): Observable<WorkerTaskEvent> {
     // TBD inject logic
     const $task = new Observable<WorkerTaskEvent>((subscriber) => {
+      $consumptionRecords.next("resource consumed!");
+      subscriber.next({ type: "started", handle: task });
       const cancel1 = setTimeout(() => {
         subscriber.next({ type: "updated", handle: task });
       }, 1000);

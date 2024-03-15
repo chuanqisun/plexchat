@@ -1,12 +1,12 @@
 import { Observable, Subscription, combineLatest, filter, from, interval, map, merge, mergeMap, takeUntil, tap } from "rxjs";
-import type { TaskEvent, TaskPool, Worker } from "./types";
+import type { ITaskPool, IWorker, TaskEvent } from "./types";
 
-export function createScheduler(options: { pool: TaskPool; workers?: Worker[] }) {
+export function createScheduler<T>(options: { pool: ITaskPool; workers?: IWorker[] }) {
   const $heartbeat = interval(1000);
   const taskPool = options.pool;
 
   const $taskAnnouncement = taskPool.$taskEvent.pipe(
-    filter((event) => event.type === "added"),
+    filter((event) => event.type === "queued"),
     map((event) => event.handle.task)
   );
 
@@ -47,7 +47,7 @@ export function createScheduler(options: { pool: TaskPool; workers?: Worker[] })
     console.log(`[scheduler] stopped`);
   }
 
-  function addWorker(worker: Worker) {
+  function addWorker(worker: IWorker) {
     return combineLatest([$taskAnnouncement, worker.$usage]).pipe(
       map(([_annoucement, usage]) => taskPool.dispatch(usage)),
       filter(isNotNull),
