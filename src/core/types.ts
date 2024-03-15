@@ -1,7 +1,7 @@
 import type { Observable, Subject } from "rxjs";
 
 export interface TaskEvent {
-  type: "created" | "queued" | "dispatched" | "started" | "updated" | "completed" | "cancelled";
+  type: "pool:created" | "pool:queued" | "pool:dispatched" | "pool:cancelled" | "worker:started" | "worker:updated" | "worker:completed" | "worker:cancelled";
   handle: TaskHandle;
 }
 
@@ -13,11 +13,11 @@ export interface TaskHandle {
 export interface IWorker<T = {}> {
   startTask: (task: TaskHandle) => Observable<WorkerTaskEvent>;
   $consumptionRecords: Observable<any>;
-  $usage: Observable<T>;
+  $state: Observable<T>;
 }
 
 export interface WorkerTaskEvent extends TaskEvent {
-  type: "started" | "updated" | "completed";
+  type: "worker:started" | "worker:updated" | "worker:completed" | "worker:cancelled";
 }
 
 export interface ITaskPool {
@@ -26,5 +26,5 @@ export interface ITaskPool {
   cancel: (handle: TaskHandle) => void;
   cancelAll: () => void;
   create: (task: any) => TaskHandle;
-  dispatch: (usage: any) => TaskHandle | null;
+  dispatch: (workerState: any) => TaskHandle | null;
 }

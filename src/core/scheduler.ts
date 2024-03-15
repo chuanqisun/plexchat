@@ -1,17 +1,17 @@
 import { Observable, Subscription, combineLatest, filter, from, interval, map, merge, mergeMap, takeUntil, tap } from "rxjs";
 import type { ITaskPool, IWorker, TaskEvent } from "./types";
 
-export function createScheduler<T>(options: { pool: ITaskPool; workers?: IWorker[] }) {
+export function createScheduler(options: { pool: ITaskPool; workers?: IWorker[] }) {
   const $heartbeat = interval(1000);
   const taskPool = options.pool;
 
   const $taskAnnouncement = taskPool.$taskEvent.pipe(
-    filter((event) => event.type === "queued"),
+    filter((event) => event.type === "pool:queued"),
     map((event) => event.handle.task)
   );
 
-  const $taskCancellation = taskPool.$taskEvent.pipe(
-    filter((event) => event.type === "cancelled"),
+  const $taskPoolCancellation = taskPool.$taskEvent.pipe(
+    filter((event) => event.type === "pool:cancelled"),
     map((event) => event.handle)
   );
 
@@ -48,11 +48,11 @@ export function createScheduler<T>(options: { pool: ITaskPool; workers?: IWorker
   }
 
   function addWorker(worker: IWorker) {
-    return combineLatest([$taskAnnouncement, worker.$usage]).pipe(
-      map(([_annoucement, usage]) => taskPool.dispatch(usage)),
+    return combineLatest([$taskAnnouncement, worker.$state]).pipe(
+      map(([_annoucement, workerState]) => taskPool.dispatch(workerState)),
       filter(isNotNull),
       mergeMap((handle) => {
-        const $cancelSignal = $taskCancellation.pipe(filter((cancelTask) => cancelTask.id === handle.id));
+        const $cancelSignal = $taskPoolCancellation.pipe(filter((cancelTask) => cancelTask.id === handle.id));
         const $task = worker.startTask(handle);
         return $task.pipe(takeUntil($cancelSignal));
       }),

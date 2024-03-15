@@ -10,21 +10,21 @@ export function createTaskPool(): ITaskPool {
     taskId++;
     console.log(`[pool] task created ${taskId}`);
     const handle = { id: taskId, task };
-    $taskEvent.next({ type: "created", handle });
+    $taskEvent.next({ type: "pool:created", handle });
     return { id: taskId, task };
   }
 
   function add(handle: TaskHandle): TaskHandle {
     console.log(`[pool] task queued ${handle.id}`);
     taskPool.set(handle.id, handle);
-    $taskEvent.next({ type: "queued", handle });
+    $taskEvent.next({ type: "pool:queued", handle });
     return handle;
   }
 
   function cancel(handle: TaskHandle) {
     console.log(`[pool] task cancelled ${handle.id}`);
     taskPool.delete(handle.id);
-    $taskEvent.next({ type: "cancelled", handle });
+    $taskEvent.next({ type: "pool:cancelled", handle });
   }
 
   function cancelAll() {
@@ -38,7 +38,7 @@ export function createTaskPool(): ITaskPool {
     const handle = next.value as TaskHandle;
     if (next.value) {
       console.log(`[pool] task dispatched ${handle.id}`);
-      $taskEvent.next({ type: "dispatched", handle });
+      $taskEvent.next({ type: "pool:dispatched", handle });
       taskPool.delete(handle.id);
       return next.value;
     } else {

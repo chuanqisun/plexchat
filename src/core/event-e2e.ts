@@ -15,9 +15,9 @@ setTimeout(() => submit("task 3").subscribe((t) => console.log(`[task]`, JSON.st
 setTimeout(() => submit("task 4").subscribe((t) => console.log(`[task]`, JSON.stringify(t))), 1500);
 setTimeout(() => submit("task 5").subscribe((t) => console.log(`[task]`, JSON.stringify(t))), 1600);
 
-// // simulate abortion
+// simulate abortion
 setTimeout(() => taskSub.unsubscribe(), 1500);
 
 setTimeout(() => {
   stop();
-}, 12000);
+}, 15000);
