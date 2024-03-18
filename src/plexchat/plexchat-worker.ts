@@ -20,6 +20,7 @@ export interface PlexEndpointManifest {
     minTimeoutMs?: number;
     timeoutMsPerToken?: number;
   }[];
+  metadata?: Record<string, any>;
 }
 
 const defaults = {
@@ -54,6 +55,7 @@ export function getPlexchatWorkers(manfest: PlexEndpointManifest) {
       concurrency: model.concurrentcy ?? defaults.concurrentcy,
       tokensPerMinute: model.tpm,
       logLevel: manfest.logLevel ?? defaults.logLevel,
+      metadata: manfest.metadata,
     });
   });
 }

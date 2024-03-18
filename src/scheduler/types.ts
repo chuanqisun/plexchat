@@ -12,6 +12,7 @@ export interface IChatWorkerManager {
 export interface IWorkerTaskRequest {
   tokenCapacity: number;
   models: string[];
+  metadata?: Record<string, any>;
 }
 
 export interface IWorkerTaskResponse {
@@ -25,6 +26,7 @@ export interface IChatTask {
   models: string[];
   input: any;
   abortHandle?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface IChatWorker {

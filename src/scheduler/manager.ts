@@ -1,4 +1,5 @@
 import { LogLevel, getLogger, type ILogger } from "./logger";
+import { matchByModel, matchByToken } from "./match";
 import type { IChatTask, IChatTaskManager, IChatWorker, IChatWorkerManager, IWorkerTaskRequest, IWorkerTaskResponse } from "./types";
 
 interface TaskHandle {
@@ -12,15 +13,26 @@ interface TaskHandle {
 export interface ChatManagerConfig {
   workers: IChatWorker[];
   logLevel?: LogLevel;
+  onInitMatchRules?: (baseRules: MatchRule[]) => MatchRule[];
 }
+
+export type MatchRule = (task: IChatTask, request: IWorkerTaskRequest) => boolean;
+
 export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   private workers: IChatWorker[];
   private taskHandles: TaskHandle[] = [];
   private logger: ILogger;
+  private matchRules: MatchRule[];
 
   constructor(config: ChatManagerConfig) {
     this.workers = config.workers;
     this.logger = getLogger(config.logLevel);
+    this.matchRules = this.getInitialMatchRules(config.onInitMatchRules);
+  }
+
+  private getInitialMatchRules(customRules: ChatManagerConfig["onInitMatchRules"]) {
+    const defaultRules: MatchRule[] = [matchByModel, matchByToken];
+    return customRules?.(defaultRules) ?? defaultRules;
   }
 
   public async submit(task: IChatTask) {
@@ -113,12 +125,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   private getMatchedTask(req: IWorkerTaskRequest, availableHandles: TaskHandle[]): TaskHandle | null {
     return (
       availableHandles.find((handle) => {
-        return (
-          // model matched
-          handle.task.models.some((demandedModel) => req.models.includes(demandedModel)) &&
-          // token limit matched
-          handle.task.tokenDemand <= req.tokenCapacity
-        );
+        return this.matchRules.every((rule) => rule(handle.task, req));
       }) ?? null
     );
   }

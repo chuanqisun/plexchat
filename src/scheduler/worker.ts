@@ -19,6 +19,7 @@ export interface ChatWorkerConfig {
   timeout: (tokenDemand: number) => number;
   tokensPerMinute: number;
   logLevel?: LogLevel;
+  metadata?: Record<string, any>;
 }
 
 export type WorkerChatProxy = (input: any, init?: RequestInit) => Promise<WorkerChatProxyResult>;
@@ -124,6 +125,7 @@ export class ChatWorker implements IChatWorker {
       return {
         tokenCapacity: 0,
         models: this.config.models,
+        metadata: this.config.metadata,
       };
     }
 
@@ -132,6 +134,7 @@ export class ChatWorker implements IChatWorker {
       return {
         tokenCapacity: 0,
         models: this.config.models,
+        metadata: this.config.metadata,
       };
     }
 
@@ -142,12 +145,14 @@ export class ChatWorker implements IChatWorker {
       return {
         tokenCapacity: 0,
         models: this.config.models,
+        metadata: this.config.metadata,
       };
     }
 
     return {
       tokenCapacity: Math.min(this.config.contextWindow, capacity.tokens),
       models: this.config.models,
+      metadata: this.config.metadata,
     };
   }
 

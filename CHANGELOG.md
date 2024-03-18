@@ -1,3 +1,8 @@
+# v0.8.0
+
+- Added: task and worker can be extended with `metadata`
+- Added: customizable rules for task-to-worker matching
+
 # v0.7.0
 
 - Changed: preserve official output format

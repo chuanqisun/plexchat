@@ -1,6 +1,6 @@
 import type { ChatInput, ChatModelName, ChatOutput, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
-import { ChatManager } from "../scheduler/manager";
+import { ChatManager, type MatchRule } from "../scheduler/manager";
 import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker";
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
@@ -15,6 +15,7 @@ export type SimpleEmbedContext = { models?: EmbedModelName[]; abortHandle?: stri
 export interface SchedulerConfig {
   onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
   onEstimateEmbedTokenDemand?: (input: EmbedInput) => number | Promise<number>;
+  onInitMatchRules?: (existingRules: MatchRule[]) => MatchRule[];
 }
 
 export interface TaskContext {
@@ -41,6 +42,7 @@ export function plexchat(config: ProxiesConfig) {
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getPlexchatWorkers({ logLevel: config.logLevel, ...manifest })),
     logLevel: config.logLevel ?? LogLevel.Error,
+    onInitMatchRules: config.scheduler?.onInitMatchRules,
   });
 
   const schedulerConfig = {
