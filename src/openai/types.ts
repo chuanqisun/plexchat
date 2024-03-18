@@ -80,5 +80,27 @@ export interface ChatCompletionMeesageToolCallFunction {
   arguments: string;
 }
 
+export interface EmbedInput {
+  input: string[] | string;
+  input_type?: string;
+  user?: string;
+  encoding_format?: string;
+  dimensions?: number;
+}
+
+export interface EmbedOutput {
+  object: string;
+  data: {
+    object: "embedding";
+    embedding: number[];
+    index: number;
+  }[];
+  model: string;
+  usage: {
+    prompt_tokens: number;
+    total_tokens: number;
+  };
+}
+
 export type ChatModelName = "gpt-35-turbo" | "gpt-35-turbo-16k" | "gpt-4" | "gpt-4-32k";
 export type EmbedModelName = "text-embedding-ada-002";

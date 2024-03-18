@@ -1,16 +1,21 @@
-import gptTokenzier from "gpt-tokenizer";
-import type { ChatInput, ChatMessage, ChatModelName, ChatOutput, EmbedModelName } from "../openai/types";
+import type { ChatInput, ChatModelName, ChatOutput, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager } from "../scheduler/manager";
 import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker";
+import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
 export type SimpleChatProxy = (input: SimpleChatInput, context?: SimpleChatContext) => Promise<ChatOutput>;
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages">;
 export type SimpleChatContext = { models?: ChatModelName[]; abortHandle?: string };
 
-export type SimpleEmbedProxy = (input: SimpleEmbedInput, context?: SimpleEmbedContext) => Promise<{ embedding: number[] }[]>;
-export type SimpleEmbedInput = string[];
+export type SimpleEmbedProxy = (input: SimpleEmbedInput, context?: SimpleEmbedContext) => Promise<EmbedOutput>;
+export type SimpleEmbedInput = Partial<EmbedInput> & Pick<EmbedInput, "input">;
 export type SimpleEmbedContext = { models?: EmbedModelName[]; abortHandle?: string };
+
+export interface SchedulerConfig {
+  onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
+  onEstimateEmbedTokenDemand?: (input: EmbedInput) => number | Promise<number>;
+}
 
 export interface TaskContext {
   abortHandle?: string;
@@ -29,6 +34,7 @@ const defaultChatInput: ChatInput = {
 export interface ProxiesConfig {
   manifests: PlexEndpointManifest[];
   logLevel?: LogLevel;
+  scheduler?: SchedulerConfig;
 }
 
 export function plexchat(config: ProxiesConfig) {
@@ -37,35 +43,33 @@ export function plexchat(config: ProxiesConfig) {
     logLevel: config.logLevel ?? LogLevel.Error,
   });
 
-  const embedProxy: SimpleEmbedProxy = (input, context) => {
-    const { models, abortHandle } = context ?? {};
-    const tokenDemand = input.map((str) => gptTokenzier.encode(str)).reduce((acc, cur) => acc + cur.length, 0);
-
-    return manager
-      .submit({
-        tokenDemand,
-        models: models ?? ["text-embedding-ada-002"],
-        abortHandle,
-        input: { input },
-      })
-      .then((result) => result.data);
+  const schedulerConfig = {
+    onEstimateChatTokenDemand: defaultEstimateChatTokenDemand,
+    onEstimateEmbedTokenDemand: defaultEstimateEmbedTokenDemand,
+    ...config.scheduler,
   };
 
-  const chatProxy: SimpleChatProxy = (input, context) => {
+  const embedProxy: SimpleEmbedProxy = async (input, context) => {
     const { models, abortHandle } = context ?? {};
-
-    const chatTokenDemand = gptTokenzier.encodeChat(normalizeMessages(input.messages), "gpt-3.5-turbo").length * 1.2;
-    const functionCallTokenDemand = input.functions ? gptTokenzier.encode(JSON.stringify(input.functions)).length * 1.2 : 0;
-    const responseTokenDemand = input.max_tokens ?? defaultChatInput.max_tokens;
+    const tokenDemand = await schedulerConfig.onEstimateEmbedTokenDemand(input);
 
     return manager.submit({
-      tokenDemand: chatTokenDemand + functionCallTokenDemand + responseTokenDemand,
+      tokenDemand,
+      models: models ?? ["text-embedding-ada-002"],
+      abortHandle,
+      input,
+    });
+  };
+
+  const chatProxy: SimpleChatProxy = async (input, context) => {
+    const { models, abortHandle } = context ?? {};
+    const finalInput = { ...defaultChatInput, ...input };
+
+    return manager.submit({
+      tokenDemand: await schedulerConfig.onEstimateChatTokenDemand(finalInput),
       models: models ?? ["gpt-35-turbo", "gpt-35-turbo-16k"],
       abortHandle,
-      input: {
-        ...defaultChatInput,
-        ...input,
-      },
+      input: finalInput,
     });
   };
 
@@ -78,12 +82,4 @@ export function plexchat(config: ProxiesConfig) {
     chatProxy,
     embedProxy,
   };
-}
-
-/** convert function call message to assistant message */
-function normalizeMessages(chatMessage: ChatMessage[]) {
-  return chatMessage.map((message) => ({
-    role: message.role === "tool" || message.role === "function" ? "assistant" : message.role,
-    content: message.role === "tool" || message.role === "function" ? JSON.stringify(message.function_call ?? message.tool_calls) : message.content!,
-  }));
 }

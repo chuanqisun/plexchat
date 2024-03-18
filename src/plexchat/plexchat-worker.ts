@@ -23,7 +23,7 @@ export interface PlexEndpointManifest {
 }
 
 const defaults = {
-  apiVersion: "2024-02-15-preview",
+  apiVersion: "2024-02-01",
   logLevel: LogLevel.Info,
   minTimeoutMs: 5_000,
   timeoutMsPerToken: 25,
