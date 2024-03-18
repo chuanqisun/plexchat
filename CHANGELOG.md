@@ -1,3 +1,7 @@
+# v0.8.1
+
+- Fixed: `metadata` was not applied in task submission
+
 # v0.8.0
 
 - Added: task and worker can be extended with `metadata`

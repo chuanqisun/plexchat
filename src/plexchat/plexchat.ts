@@ -6,11 +6,11 @@ import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from 
 
 export type SimpleChatProxy = (input: SimpleChatInput, context?: SimpleChatContext) => Promise<ChatOutput>;
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages">;
-export type SimpleChatContext = { models?: ChatModelName[]; abortHandle?: string };
+export type SimpleChatContext = { models?: ChatModelName[]; abortHandle?: string; metadata?: Record<string, any> };
 
 export type SimpleEmbedProxy = (input: SimpleEmbedInput, context?: SimpleEmbedContext) => Promise<EmbedOutput>;
 export type SimpleEmbedInput = Partial<EmbedInput> & Pick<EmbedInput, "input">;
-export type SimpleEmbedContext = { models?: EmbedModelName[]; abortHandle?: string };
+export type SimpleEmbedContext = { models?: EmbedModelName[]; abortHandle?: string; metadata?: Record<string, any> };
 
 export interface SchedulerConfig {
   onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
@@ -52,7 +52,7 @@ export function plexchat(config: ProxiesConfig) {
   };
 
   const embedProxy: SimpleEmbedProxy = async (input, context) => {
-    const { models, abortHandle } = context ?? {};
+    const { models, abortHandle, metadata } = context ?? {};
     const tokenDemand = await schedulerConfig.onEstimateEmbedTokenDemand(input);
 
     return manager.submit({
@@ -60,11 +60,12 @@ export function plexchat(config: ProxiesConfig) {
       models: models ?? ["text-embedding-ada-002"],
       abortHandle,
       input,
+      metadata,
     });
   };
 
   const chatProxy: SimpleChatProxy = async (input, context) => {
-    const { models, abortHandle } = context ?? {};
+    const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
 
     return manager.submit({
@@ -72,6 +73,7 @@ export function plexchat(config: ProxiesConfig) {
       models: models ?? ["gpt-35-turbo", "gpt-35-turbo-16k"],
       abortHandle,
       input: finalInput,
+      metadata,
     });
   };
 
