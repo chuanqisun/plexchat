@@ -16,7 +16,7 @@ export interface ChatManagerConfig {
   onInitMatchRules?: (baseRules: MatchRule[]) => MatchRule[];
 }
 
-export type MatchRule = (task: IChatTask, request: IWorkerTaskRequest) => boolean;
+export type MatchRule = (workerTaskRequest: IWorkerTaskRequest, candidateTask: IChatTask) => boolean;
 
 export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   private workers: IChatWorker[];
@@ -125,7 +125,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   private getMatchedTask(req: IWorkerTaskRequest, availableHandles: TaskHandle[]): TaskHandle | null {
     return (
       availableHandles.find((handle) => {
-        return this.matchRules.every((rule) => rule(handle.task, req));
+        return this.matchRules.every((rule) => rule(req, handle.task));
       }) ?? null
     );
   }
