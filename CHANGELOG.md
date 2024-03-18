@@ -1,25 +1,29 @@
+# v0.9.0
+
+- Changed: More intuitive `MatchRule` interface
+
 # v0.8.1
 
 - Fixed: `metadata` was not applied in task submission
 
 # v0.8.0
 
-- Added: task and worker can be extended with `metadata`
-- Added: customizable rules for task-to-worker matching
+- Added: Task and worker can be extended with `metadata`
+- Added: Customizable rules for task-to-worker matching
 
 # v0.7.0
 
-- Changed: preserve official output format
-- Changed: customizable token estimation
-- Changed: default api version at `2024-02-01`
+- Changed: Preserve official output format
+- Changed: Customizable token estimation
+- Changed: Default api version at `2024-02-01`
 
 # v0.6.1
 
-- Changed: default api version at `2024-02-15-preview`
+- Changed: Default api version at `2024-02-15-preview`
 
 # v0.6.0
 
-- Fixed: tools API typing
+- Fixed: Tools API typing
 
 # v0.5.2
 
