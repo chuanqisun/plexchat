@@ -1,3 +1,8 @@
+# v0.10.0
+
+- Added: Sweep rules
+- Changed: Factory interface rules
+
 # v0.9.1
 
 - Fixed: Task abortion leaked to unselected tasks

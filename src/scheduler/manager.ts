@@ -1,5 +1,5 @@
 import { LogLevel, getLogger, type ILogger } from "./logger";
-import { matchByModel, matchByToken } from "./match";
+import { globalTimeout, matchByModel, matchByToken } from "./rules";
 import type { IChatTask, IChatTaskManager, IChatWorker, IChatWorkerManager, IWorkerTaskRequest, IWorkerTaskResponse } from "./types";
 
 interface TaskHandle {
@@ -8,30 +8,79 @@ interface TaskHandle {
   reject: (error: any) => void;
   isRunning?: boolean;
   retryLeft: number;
+  createdAt: number;
 }
 
 export interface ChatManagerConfig {
   workers: IChatWorker[];
   logLevel?: LogLevel;
   onInitMatchRules?: (baseRules: MatchRule[]) => MatchRule[];
+  onInitSweepRules?: (baseRules: SweepRule[]) => SweepRule[];
+  globalTaskTimeoutMs?: number;
+  taskSweepIntervalMs?: number;
 }
 
 export type MatchRule = (workerTaskRequest: IWorkerTaskRequest, candidateTask: IChatTask) => boolean;
+export type SweepRule = (task: SweepTaskHandle) => SweepResult;
+export interface SweepTaskHandle {
+  task: IChatTask;
+  isRunning?: boolean;
+  retryLeft: number;
+  createdAt: number;
+}
+export interface SweepResult {
+  shouldRemove: boolean;
+  reason?: string;
+}
 
 export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   private workers: IChatWorker[];
   private taskHandles: TaskHandle[] = [];
   private logger: ILogger;
   private matchRules: MatchRule[];
+  private sweepRules: SweepRule[];
+  private taskSweepIntervalMs: number;
+  private globalTaskTimeoutMs: number;
 
   constructor(config: ChatManagerConfig) {
     this.workers = config.workers;
     this.logger = getLogger(config.logLevel);
     this.matchRules = this.getInitialMatchRules(config.onInitMatchRules);
+    this.sweepRules = this.getInitialSweepRules(config.onInitSweepRules);
+    this.taskSweepIntervalMs = Math.max(config.taskSweepIntervalMs ?? 5_000, 100);
+    this.globalTaskTimeoutMs = config.globalTaskTimeoutMs ?? 30_000;
+
+    if (this.sweepRules.length) {
+      setInterval(() => this.sweep(), this.taskSweepIntervalMs);
+    }
+  }
+
+  private sweep() {
+    this.taskHandles = this.taskHandles.filter((t) => {
+      const sweepResult = this.sweepRules.map((rule) => rule(t));
+      const removal = sweepResult.find((r) => r.shouldRemove);
+      if (!removal) return true;
+
+      const reason = removal.reason ?? "(no reason povided)";
+      this.logger.warn(`[manager] task removed ${reason}`);
+      t.reject(new Error(`task removed ${reason}`));
+
+      if (t.isRunning) {
+        // Sweep conducts forced removal. Remove the handle even if it is owned by the worker
+        this.workers.forEach((worker) => worker.abort((task) => task === t.task));
+      }
+
+      return false;
+    });
+  }
+
+  private getInitialSweepRules(customRules: ChatManagerConfig["onInitSweepRules"]) {
+    const defaultRules: SweepRule[] = [globalTimeout({ timeoutMs: this.globalTaskTimeoutMs })];
+    return customRules?.(defaultRules) ?? defaultRules;
   }
 
   private getInitialMatchRules(customRules: ChatManagerConfig["onInitMatchRules"]) {
-    const defaultRules: MatchRule[] = [matchByModel, matchByToken];
+    const defaultRules: MatchRule[] = [matchByModel(), matchByToken()];
     return customRules?.(defaultRules) ?? defaultRules;
   }
 
@@ -42,6 +91,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
         retryLeft: 3,
         resolve,
         reject,
+        createdAt: Date.now(),
       };
 
       this.announceNewTask(taskHandle);
@@ -87,8 +137,8 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   public respond(task: IChatTask, result: IWorkerTaskResponse) {
     const taskHandle = this.taskHandles.find((t) => t.task === task);
     if (!taskHandle) {
-      this.logger.error(`[manager] task handle not found`);
-      throw new Error("task handle not found");
+      this.logger.warn(`[manager] task handle already removed, no-op`);
+      return;
     }
 
     // remove task handle from list

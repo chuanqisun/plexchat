@@ -5,6 +5,6 @@ export * from "./plexchat/plexchat";
 export * from "./plexchat/plexchat-worker";
 export * from "./scheduler/logger";
 export * from "./scheduler/manager";
-export * from "./scheduler/match";
+export * from "./scheduler/rules";
 export * from "./scheduler/types";
 export * from "./scheduler/worker";
