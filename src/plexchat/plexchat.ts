@@ -1,6 +1,6 @@
 import type { ChatInput, ChatModelName, ChatOutput, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
-import { ChatManager, type MatchRule } from "../scheduler/manager";
+import { ChatManager, type MatchRule, type SweepRule } from "../scheduler/manager";
 import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker";
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
@@ -11,12 +11,6 @@ export type SimpleChatContext = { models?: ChatModelName[]; abortHandle?: string
 export type SimpleEmbedProxy = (input: SimpleEmbedInput, context?: SimpleEmbedContext) => Promise<EmbedOutput>;
 export type SimpleEmbedInput = Partial<EmbedInput> & Pick<EmbedInput, "input">;
 export type SimpleEmbedContext = { models?: EmbedModelName[]; abortHandle?: string; metadata?: Record<string, any> };
-
-export interface SchedulerConfig {
-  onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
-  onEstimateEmbedTokenDemand?: (input: EmbedInput) => number | Promise<number>;
-  onInitMatchRules?: (existingRules: MatchRule[]) => MatchRule[];
-}
 
 export interface TaskContext {
   abortHandle?: string;
@@ -32,28 +26,31 @@ const defaultChatInput: ChatInput = {
   stop: "",
 };
 
-export interface ProxiesConfig {
+export interface PlexchatConfig {
   manifests: PlexEndpointManifest[];
   logLevel?: LogLevel;
-  scheduler?: SchedulerConfig;
+  onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
+  onEstimateEmbedTokenDemand?: (input: EmbedInput) => number | Promise<number>;
+  onInitSweepRules?: (existingRules: SweepRule[]) => SweepRule[];
+  onInitMatchRules?: (existingRules: MatchRule[]) => MatchRule[];
 }
 
-export function plexchat(config: ProxiesConfig) {
+export function plexchat(config: PlexchatConfig) {
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getPlexchatWorkers({ logLevel: config.logLevel, ...manifest })),
     logLevel: config.logLevel ?? LogLevel.Error,
-    onInitMatchRules: config.scheduler?.onInitMatchRules,
+    onInitMatchRules: config.onInitMatchRules,
+    onInitSweepRules: config.onInitSweepRules,
   });
 
-  const schedulerConfig = {
-    onEstimateChatTokenDemand: defaultEstimateChatTokenDemand,
-    onEstimateEmbedTokenDemand: defaultEstimateEmbedTokenDemand,
-    ...config.scheduler,
+  const estimators = {
+    onEstimateChatTokenDemand: config.onEstimateChatTokenDemand ?? defaultEstimateChatTokenDemand,
+    onEstimateEmbedTokenDemand: config.onEstimateEmbedTokenDemand ?? defaultEstimateEmbedTokenDemand,
   };
 
   const embedProxy: SimpleEmbedProxy = async (input, context) => {
     const { models, abortHandle, metadata } = context ?? {};
-    const tokenDemand = await schedulerConfig.onEstimateEmbedTokenDemand(input);
+    const tokenDemand = await estimators.onEstimateEmbedTokenDemand(input);
 
     return manager.submit({
       tokenDemand,
@@ -69,7 +66,7 @@ export function plexchat(config: ProxiesConfig) {
     const finalInput = { ...defaultChatInput, ...input };
 
     return manager.submit({
-      tokenDemand: await schedulerConfig.onEstimateChatTokenDemand(finalInput),
+      tokenDemand: await estimators.onEstimateChatTokenDemand(finalInput),
       models: models ?? ["gpt-35-turbo", "gpt-35-turbo-16k"],
       abortHandle,
       input: finalInput,

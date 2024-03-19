@@ -16,8 +16,6 @@ export interface ChatManagerConfig {
   logLevel?: LogLevel;
   onInitMatchRules?: (baseRules: MatchRule[]) => MatchRule[];
   onInitSweepRules?: (baseRules: SweepRule[]) => SweepRule[];
-  globalTaskTimeoutMs?: number;
-  taskSweepIntervalMs?: number;
 }
 
 export type MatchRule = (workerTaskRequest: IWorkerTaskRequest, candidateTask: IChatTask) => boolean;
@@ -34,21 +32,23 @@ export interface SweepResult {
 }
 
 export class ChatManager implements IChatTaskManager, IChatWorkerManager {
+  static DEFAULT_SWEEP_INTERVAL_MS = 5_000;
+  static MIN_SWEEP_INTERVAL_MS = 100;
+  static DEFAULT_GLOBAL_TIMEOUT_MS = 30_000;
+
   private workers: IChatWorker[];
   private taskHandles: TaskHandle[] = [];
   private logger: ILogger;
   private matchRules: MatchRule[];
   private sweepRules: SweepRule[];
   private taskSweepIntervalMs: number;
-  private globalTaskTimeoutMs: number;
 
   constructor(config: ChatManagerConfig) {
     this.workers = config.workers;
     this.logger = getLogger(config.logLevel);
     this.matchRules = this.getInitialMatchRules(config.onInitMatchRules);
     this.sweepRules = this.getInitialSweepRules(config.onInitSweepRules);
-    this.taskSweepIntervalMs = Math.max(config.taskSweepIntervalMs ?? 5_000, 100);
-    this.globalTaskTimeoutMs = config.globalTaskTimeoutMs ?? 30_000;
+    this.taskSweepIntervalMs = ChatManager.DEFAULT_SWEEP_INTERVAL_MS;
 
     if (this.sweepRules.length) {
       setInterval(() => this.sweep(), this.taskSweepIntervalMs);
@@ -75,7 +75,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   }
 
   private getInitialSweepRules(customRules: ChatManagerConfig["onInitSweepRules"]) {
-    const defaultRules: SweepRule[] = [globalTimeout({ timeoutMs: this.globalTaskTimeoutMs })];
+    const defaultRules: SweepRule[] = [globalTimeout({ timeoutMs: ChatManager.DEFAULT_GLOBAL_TIMEOUT_MS })];
     return customRules?.(defaultRules) ?? defaultRules;
   }
 

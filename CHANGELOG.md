@@ -1,3 +1,7 @@
+# v0.11.0
+
+- Changed: Simplied API
+
 # v0.10.0
 
 - Added: Sweep rules
