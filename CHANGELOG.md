@@ -1,3 +1,7 @@
+# v0.9.1
+
+- Fixed: Task abortion leaked to unselected tasks
+
 # v0.9.0
 
 - Changed: More intuitive `MatchRule` interface
