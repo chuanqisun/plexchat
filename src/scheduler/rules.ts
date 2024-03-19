@@ -5,7 +5,7 @@ export const matchByModel: () => MatchRule = () => (workerTaskRequest, candidate
 
 export const matchByToken: () => MatchRule = () => (workerTaskRequest, candidateTask) => candidateTask.tokenDemand <= workerTaskRequest.tokenCapacity;
 
-export const globalTimeout: (option: { timeoutMs: number }) => SweepRule = (option) => (task) => {
+export const globalTimeout: (timeoutMs: number) => SweepRule = (timeoutMs) => (task) => {
   const duration = Date.now() - task.createdAt;
-  return { shouldRemove: duration > option.timeoutMs, reason: `task expired, duration ${duration} ms` };
+  return { shouldRemove: duration > timeoutMs, reason: `task expired, duration ${duration} ms` };
 };

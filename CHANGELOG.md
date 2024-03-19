@@ -1,3 +1,7 @@
+# v0.12.0
+
+- Changed: Simplied `globalTimeout` rule interface
+
 # v0.11.0
 
 - Changed: Simplied API

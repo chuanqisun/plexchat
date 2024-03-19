@@ -75,7 +75,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   }
 
   private getInitialSweepRules(customRules: ChatManagerConfig["onInitSweepRules"]) {
-    const defaultRules: SweepRule[] = [globalTimeout({ timeoutMs: ChatManager.DEFAULT_GLOBAL_TIMEOUT_MS })];
+    const defaultRules: SweepRule[] = [globalTimeout(ChatManager.DEFAULT_GLOBAL_TIMEOUT_MS)];
     return customRules?.(defaultRules) ?? defaultRules;
   }
 
