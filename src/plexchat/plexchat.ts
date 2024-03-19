@@ -1,6 +1,6 @@
 import type { ChatInput, ChatModelName, ChatOutput, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
-import { ChatManager, type MatchRule, type SweepRule } from "../scheduler/manager";
+import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
 import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker";
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
@@ -29,10 +29,31 @@ const defaultChatInput: ChatInput = {
 export interface PlexchatConfig {
   manifests: PlexEndpointManifest[];
   logLevel?: LogLevel;
+  /**
+   * Estimate the number of tokens needed for chat task
+   * By default, tokens are calculated with gptTokenier
+   */
   onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
+  /**
+   * Estimate the number of tokens needed for embedding task
+   * By default, tokens are calculated with gptTokenier
+   */
   onEstimateEmbedTokenDemand?: (input: EmbedInput) => number | Promise<number>;
+  /**
+   * Sweep rules reject tasks with error. Use this to clean up hanging tasks that are not making progress
+   * By default, sweep rules remove tasks running long than 30 seconds
+   */
   onInitSweepRules?: (existingRules: SweepRule[]) => SweepRule[];
+  /**
+   * Match rules determine whether a worker can pick up a task. Use this to match tasks based on worker capabilities
+   * By default, tasks are matched based on model and token demand
+   */
   onInitMatchRules?: (existingRules: MatchRule[]) => MatchRule[];
+  /**
+   * Sort rules determine the order in which tasks are picked up by workers. Use this to prioritize tasks
+   * By default, both new and retry tasks are appended to a queue and never sorted.
+   */
+  onInitSortRules?: (existingRules: SortRule[]) => SortRule[];
 }
 
 export function plexchat(config: PlexchatConfig) {
@@ -41,6 +62,7 @@ export function plexchat(config: PlexchatConfig) {
     logLevel: config.logLevel ?? LogLevel.Error,
     onInitMatchRules: config.onInitMatchRules,
     onInitSweepRules: config.onInitSweepRules,
+    onInitSortRules: config.onInitSortRules,
   });
 
   const estimators = {

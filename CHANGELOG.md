@@ -1,3 +1,7 @@
+# v0.13.0
+
+- Added: `SortRule` support for custom priority
+
 # v0.12.0
 
 - Changed: Simplied `globalTimeout` rule interface

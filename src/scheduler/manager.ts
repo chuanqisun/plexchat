@@ -16,6 +16,7 @@ export interface ChatManagerConfig {
   logLevel?: LogLevel;
   onInitMatchRules?: (baseRules: MatchRule[]) => MatchRule[];
   onInitSweepRules?: (baseRules: SweepRule[]) => SweepRule[];
+  onInitSortRules?: (baseRules: SortRule[]) => SortRule[];
 }
 
 export type MatchRule = (workerTaskRequest: IWorkerTaskRequest, candidateTask: IChatTask) => boolean;
@@ -31,6 +32,13 @@ export interface SweepResult {
   reason?: string;
 }
 
+export interface SortTaskHandle {
+  task: IChatTask;
+  retryLeft: number;
+  createdAt: number;
+}
+export type SortRule = (a: SortTaskHandle, b: SortTaskHandle) => number;
+
 export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   static DEFAULT_SWEEP_INTERVAL_MS = 5_000;
   static MIN_SWEEP_INTERVAL_MS = 100;
@@ -41,6 +49,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   private logger: ILogger;
   private matchRules: MatchRule[];
   private sweepRules: SweepRule[];
+  private sortRules: SortRule[];
   private taskSweepIntervalMs: number;
 
   constructor(config: ChatManagerConfig) {
@@ -48,11 +57,18 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     this.logger = getLogger(config.logLevel);
     this.matchRules = this.getInitialMatchRules(config.onInitMatchRules);
     this.sweepRules = this.getInitialSweepRules(config.onInitSweepRules);
+    this.sortRules = config.onInitSortRules?.([]) ?? [];
     this.taskSweepIntervalMs = ChatManager.DEFAULT_SWEEP_INTERVAL_MS;
 
     if (this.sweepRules.length) {
       setInterval(() => this.sweep(), this.taskSweepIntervalMs);
     }
+  }
+
+  private multiSort(a: SortTaskHandle, b: SortTaskHandle) {
+    return this.sortRules.reduce((acc, rule) => {
+      return acc || rule(a, b);
+    }, 0);
   }
 
   private sweep() {
@@ -121,7 +137,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
       return null;
     }
 
-    const pendingTasks = this.taskHandles.filter((t) => !t.isRunning);
+    const pendingTasks = this.taskHandles.filter((t) => !t.isRunning).sort(this.multiSort.bind(this));
     const matchedTask = this.getMatchedTask(req, pendingTasks);
 
     if (!matchedTask) {
