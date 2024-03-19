@@ -57,8 +57,8 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   }
 
   public abort(selectTask: (task: IChatTask) => boolean) {
-    // clear all unassigned tasks
-    this.taskHandles = this.taskHandles.filter((t) => t.isRunning);
+    // clear selected unassigned tasks
+    this.taskHandles = this.taskHandles.filter((t) => t.isRunning || !selectTask(t.task));
 
     // abort selected assigned tasks
     this.workers.forEach((worker) => worker.abort(selectTask));
