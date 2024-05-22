@@ -52,6 +52,7 @@ export function getPlexchatWorkers(manfest: PlexEndpointManifest) {
       proxy: getOpenAIWorkerProxy({
         apiKey: manfest.apiKey,
         endpoint: endpoint.toString(),
+        logger,
       }),
       requestsPerMinute: model.rpm,
       timeout: getTimeoutFunction(model.minTimeoutMs ?? defaults.minTimeoutMs, model.timeoutMsPerToken ?? defaults.timeoutMsPerToken),
