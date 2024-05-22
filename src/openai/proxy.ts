@@ -1,14 +1,20 @@
+import type { ILogger } from "../scheduler/logger";
 import type { WorkerChatProxy } from "../scheduler/worker";
 import type { ChatInput } from "./types";
 
 export interface ProxyConfig {
   apiKey: string;
   endpoint: string;
+  logger?: ILogger;
 }
-export function getOpenAIWorkerProxy({ apiKey, endpoint }: ProxyConfig): WorkerChatProxy {
+export function getOpenAIWorkerProxy({ apiKey, endpoint, logger }: ProxyConfig): WorkerChatProxy {
   return async (input: ChatInput, init?: RequestInit) => {
     let response: Response;
     try {
+      if (logger) {
+        logger.info(`[proxy] POST ${endpoint}\n${JSON.stringify(input, null, 2)}`);
+      }
+
       response = await fetch(endpoint, {
         method: "POST",
         headers: {
