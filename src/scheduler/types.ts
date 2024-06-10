@@ -34,7 +34,7 @@ export interface IChatWorker {
   start: (manager: IChatWorkerManager) => void;
   // worker must stop polling new tasks and immediately reject all running tasks with Abort error
   abortAll: () => void;
-  // must only aborts selected tasks. If all tasks are aborted, it should stop too
+  // must only abort selected tasks. If all tasks are aborted, it should stop too
   abort: (selectTask: (task: IChatTask) => boolean) => void;
   // worker must top polling future tasks but can continue with unfinished tasks
   stop: () => void;
