@@ -1,5 +1,5 @@
 import { TIMEOUT_ABORT_REASON, withTimeout } from "../controller/timeout";
-import { getCapacity } from "./capacity";
+import { getCapacity, getWindowedUsage } from "./capacity";
 import { LogLevel, getLogger, type ILogger } from "./logger";
 import { Poller } from "./poller";
 import type { IChatTask, IChatWorker, IChatWorkerManager, IWorkerTaskRequest } from "./types";
@@ -60,13 +60,13 @@ export class ChatWorker implements IChatWorker {
   }
 
   public status() {
-    const used = getCapacity(this.config.requestsPerMinute, this.config.tokensPerMinute, this.capacityRecords);
+    const usedPerMinute = getWindowedUsage(60_000, this.capacityRecords);
     return {
       models: this.config.models,
       tokensPerMinute: this.config.tokensPerMinute,
-      tokensPerMinuteUsed: used.tokens,
+      tokensPerMinuteUsed: usedPerMinute.tokens,
       requestsPerMinute: this.config.requestsPerMinute,
-      requestsPerMinuteUsed: used.requests,
+      requestsPerMinuteUsed: usedPerMinute.requests,
       metadata: this.config.metadata,
     };
   }
