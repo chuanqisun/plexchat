@@ -89,7 +89,7 @@ export function plexchat(config: PlexchatConfig) {
 
     return manager.submit({
       tokenDemand: await estimators.onEstimateChatTokenDemand(finalInput),
-      models: models ?? ["gpt-35-turbo", "gpt-35-turbo-16k"],
+      models: models ?? ["gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
       abortHandle,
       input: finalInput,
       metadata,
