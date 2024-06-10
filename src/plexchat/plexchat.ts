@@ -33,12 +33,12 @@ export interface PlexchatConfig {
    * Estimate the number of tokens needed for chat task
    * By default, tokens are calculated with gptTokenier
    */
-  onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
+  onEstimateChatTokenDemand?: (input: ChatInput, context?: { models?: ChatModelName[] }) => number | Promise<number>;
   /**
    * Estimate the number of tokens needed for embedding task
    * By default, tokens are calculated with gptTokenier
    */
-  onEstimateEmbedTokenDemand?: (input: EmbedInput) => number | Promise<number>;
+  onEstimateEmbedTokenDemand?: (input: EmbedInput, context?: { models?: EmbedModelName[] }) => number | Promise<number>;
   /**
    * Sweep rules reject tasks with error. Use this to clean up hanging tasks that are not making progress
    * By default, sweep rules remove tasks running long than 30 seconds

@@ -1,6 +1,6 @@
 {
   "name": "plexchat",
-  "version": "0.16.0",
+  "version": "1.0.0",
   "description": "High throughput Azure OpenAI Chat Client",
   "main": "src/index.ts",
   "homepage": "https://github.com/chuanqisun/plexchat",
@@ -20,6 +20,6 @@
     "tsx": "^3.12.7"
   },
   "dependencies": {
-    "gpt-tokenizer": "^2.1.1"
+    "gpt-tokenizer": "^2.1.2"
   }
 }
