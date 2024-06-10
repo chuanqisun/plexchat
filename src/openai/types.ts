@@ -10,6 +10,7 @@ export interface ChatInput {
   frequency_penalty: number;
   presence_penalty: number;
   max_tokens: number;
+  response_format?: ChatCompletionResponseFormat;
   stop: null | string | string[];
 
   /** @deprecate use `tools` instead */
@@ -38,6 +39,10 @@ export interface ChatCompletionNamedToolChoice {
   function: {
     name: string;
   };
+}
+
+export interface ChatCompletionResponseFormat {
+  type: "json_object" | "text";
 }
 
 export type ToolChoiceDetails = {
