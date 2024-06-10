@@ -98,11 +98,13 @@ export function plexchat(config: PlexchatConfig) {
 
   const abortAll = () => manager.abortAll();
   const abort = (abortHandle: string) => manager.abort((task) => task.abortHandle === abortHandle);
+  const status = () => manager.status();
 
   return {
     abort,
     abortAll,
     chatProxy,
     embedProxy,
+    status,
   };
 }
