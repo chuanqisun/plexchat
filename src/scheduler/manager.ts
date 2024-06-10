@@ -185,10 +185,8 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
   public status() {
     const workerStatus = this.workers.map((worker) => worker.status());
     const managerStatus = {
-      tasks: {
-        pending: this.taskHandles.filter((t) => !t.isRunning).length,
-        running: this.taskHandles.filter((t) => t.isRunning).length,
-      },
+      pendingTasks: this.taskHandles.filter((t) => !t.isRunning).length,
+      runningTasks: this.taskHandles.filter((t) => t.isRunning).length,
     };
 
     return {

@@ -62,14 +62,12 @@ export class ChatWorker implements IChatWorker {
   public status() {
     const used = getCapacity(this.config.requestsPerMinute, this.config.tokensPerMinute, this.capacityRecords);
     return {
-      tokens: {
-        used: used.tokens,
-        limit: this.config.tokensPerMinute,
-      },
-      requests: {
-        used: used.requests,
-        limit: this.config.requestsPerMinute,
-      },
+      models: this.config.models,
+      tokensPerMinute: this.config.tokensPerMinute,
+      tokensPerMinuteUsed: used.tokens,
+      requestsPerMinute: this.config.requestsPerMinute,
+      requestsPerMinuteUsed: used.requests,
+      metadata: this.config.metadata,
     };
   }
 

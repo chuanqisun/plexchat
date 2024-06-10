@@ -9,10 +9,8 @@ export interface IChatTaskManager {
 }
 
 export interface IChatManagerStatus {
-  tasks: {
-    pending: number;
-    running: number;
-  };
+  pendingTasks: number;
+  runningTasks: number;
 }
 
 export interface IChatWorkerManager {
@@ -54,12 +52,10 @@ export interface IChatWorker {
 }
 
 export interface IChatWorkerStatus {
-  tokens: {
-    used: number;
-    limit: number;
-  };
-  requests: {
-    used: number;
-    limit: number;
-  };
+  models: string[];
+  requestsPerMinute: number;
+  requestsPerMinuteUsed: number;
+  tokensPerMinute: number;
+  tokensPerMinuteUsed: number;
+  metadata?: Record<string, any>;
 }
