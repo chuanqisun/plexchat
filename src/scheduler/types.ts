@@ -2,10 +2,12 @@ export interface IChatTaskManager {
   submit: (task: IChatTask) => Promise<any>;
   abortAll: () => void;
   abort: (selectTask: (task: IChatTask) => boolean) => void;
-  status: () => {
-    manager: IChatManagerStatus;
-    workers: IChatWorkerStatus[];
-  };
+  status: () => IChatTaskManagerStatus;
+}
+
+export interface IChatTaskManagerStatus {
+  manager: IChatManagerStatus;
+  workers: IChatWorkerStatus[];
 }
 
 export interface IChatManagerStatus {

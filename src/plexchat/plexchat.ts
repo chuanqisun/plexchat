@@ -1,6 +1,7 @@
 import type { ChatInput, ChatModelName, ChatOutput, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
+import type { IChatTaskManagerStatus } from "../scheduler/types";
 import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker";
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
@@ -56,7 +57,15 @@ export interface PlexchatConfig {
   onInitSortRules?: (existingRules: SortRule[]) => SortRule[];
 }
 
-export function plexchat(config: PlexchatConfig) {
+export interface Plexchat {
+  abort: (abortHandle: string) => void;
+  abortAll: () => void;
+  chatProxy: SimpleChatProxy;
+  embedProxy: SimpleEmbedProxy;
+  status: () => IChatTaskManagerStatus;
+}
+
+export function plexchat(config: PlexchatConfig): Plexchat {
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getPlexchatWorkers({ logLevel: config.logLevel, ...manifest })),
     logLevel: config.logLevel ?? LogLevel.Error,
