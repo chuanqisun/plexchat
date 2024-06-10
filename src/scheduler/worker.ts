@@ -59,6 +59,20 @@ export class ChatWorker implements IChatWorker {
     this.logger = getLogger(config.logLevel);
   }
 
+  public status() {
+    const used = getCapacity(this.config.requestsPerMinute, this.config.tokensPerMinute, this.capacityRecords);
+    return {
+      tokens: {
+        used: used.tokens,
+        limit: this.config.tokensPerMinute,
+      },
+      requests: {
+        used: used.requests,
+        limit: this.config.requestsPerMinute,
+      },
+    };
+  }
+
   public start(manager: IChatWorkerManager) {
     this.logger.debug(`[worker] started`);
     // poll immediately because start was requested by the manager

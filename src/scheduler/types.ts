@@ -2,6 +2,17 @@ export interface IChatTaskManager {
   submit: (task: IChatTask) => Promise<any>;
   abortAll: () => void;
   abort: (selectTask: (task: IChatTask) => boolean) => void;
+  status: () => {
+    manager: IChatManagerStatus;
+    workers: IChatWorkerStatus[];
+  };
+}
+
+export interface IChatManagerStatus {
+  tasks: {
+    pending: number;
+    running: number;
+  };
 }
 
 export interface IChatWorkerManager {
@@ -38,4 +49,17 @@ export interface IChatWorker {
   abort: (selectTask: (task: IChatTask) => boolean) => void;
   // worker must top polling future tasks but can continue with unfinished tasks
   stop: () => void;
+  // report worker load
+  status: () => IChatWorkerStatus;
+}
+
+export interface IChatWorkerStatus {
+  tokens: {
+    used: number;
+    limit: number;
+  };
+  requests: {
+    used: number;
+    limit: number;
+  };
 }
