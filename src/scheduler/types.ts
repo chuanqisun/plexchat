@@ -59,5 +59,4 @@ export interface IChatWorkerStatus {
   requestsPerMinuteUsed: number;
   tokensPerMinute: number;
   tokensPerMinuteUsed: number;
-  metadata?: Record<string, any>;
 }

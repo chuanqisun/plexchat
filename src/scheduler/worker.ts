@@ -67,7 +67,6 @@ export class ChatWorker implements IChatWorker {
       tokensPerMinuteUsed: usedPerMinute.tokens,
       requestsPerMinute: this.config.requestsPerMinute,
       requestsPerMinuteUsed: usedPerMinute.requests,
-      metadata: this.config.metadata,
     };
   }
 
