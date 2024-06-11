@@ -182,6 +182,19 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     this.logger.info(`[manager] ${this.taskHandles.length - runningTasks.length} waiting | ${runningTasks.length} running`);
   }
 
+  public status() {
+    const workerStatus = this.workers.map((worker) => worker.status());
+    const managerStatus = {
+      pendingTasks: this.taskHandles.filter((t) => !t.isRunning).length,
+      runningTasks: this.taskHandles.filter((t) => t.isRunning).length,
+    };
+
+    return {
+      manager: managerStatus,
+      workers: workerStatus,
+    };
+  }
+
   private announceNewTask(handle: TaskHandle) {
     this.taskHandles.push(handle);
     this.logger.info(`[manager] ${this.taskHandles.length} tasks | ${this.workers.length} workers`);

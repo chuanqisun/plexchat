@@ -73,3 +73,25 @@ export function getCapacity(requestsPerMinute: number, tokensPerMinute: number, 
     requests: Math.min(requestCapacity10s, requestCapacity60s),
   };
 }
+export interface WindowedUsage {
+  tokens: number;
+  requests: number;
+}
+export function getWindowedUsage(windowSizeMs: number, records: TaskRecord[]): WindowedUsage {
+  const windowStartMs = Date.now() - windowSizeMs;
+
+  return records.reduce<WindowedUsage>(
+    (result, record) => {
+      if (record.startedAt > windowStartMs) {
+        result.tokens += record.tokensDemanded;
+        result.requests++;
+      }
+
+      return result;
+    },
+    {
+      tokens: 0,
+      requests: 0,
+    }
+  );
+}

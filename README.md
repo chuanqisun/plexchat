@@ -8,7 +8,6 @@ High throughput Azure OpenAI Chat Client.
 - Built-in retry based on HTTP header and heuristics
 - Built-in queue for burst of traffic
 
-
 ## Get started
 
 Install
@@ -27,15 +26,15 @@ const { chatProxy, embedProxy } = plexchat({
       endpoint: "https://<your-deployment>.openai.azure.com",
       models: [
         {
-          deploymentName: "gpt-35-turbo",
-          modelName: "gpt-35-turbo",
+          deploymentName: "gpt-3.5-turbo",
+          modelName: "gpt-3.5-turbo",
           contextWindow: 4_096,
           rpm: 1_242,
           tpm: 207_000,
         },
         {
-          deploymentName: "gpt-35-turbo-16k",
-          modelName: "gpt-35-turbo-16k",
+          deploymentName: "gpt-3.5-turbo-16k",
+          modelName: "gpt-3.5-turbo-16k",
           contextWindow: 16_384,
           rpm: 1_440,
           tpm: 240_000,
@@ -85,11 +84,13 @@ embedProxy(["Hello world", "Fizz buzz"]);
 ## How does it work
 
 We instantiate one [worker](https://github.com/chuanqisun/plexchat/blob/master/src/scheduler/worker.ts) for each endpoint. The worker polls the manager for task by announcing its current capacity. The capacity is based on:
+
 1. Token limit
 2. Rate limit
 3. Past consumption
 
 The [manager](https://github.com/chuanqisun/plexchat/blob/master/src/scheduler/manager.ts) uses a queue to track user requests. Each user request is decorated with metadata about its demand:
+
 1. Prompt token consumption
 2. Max response token limit
 3. Model compatibility
@@ -97,7 +98,6 @@ The [manager](https://github.com/chuanqisun/plexchat/blob/master/src/scheduler/m
 The manager dispatches the task to the first polling worker that has a capacity that meets or exceeds the demand. When the worker finishes the task, the result is returned to the user. When the worker fails the task, the task is requeued until all retries are used up.
 
 For user convenience, we provide [a factory to instantiate the manager](https://github.com/chuanqisun/plexchat/blob/master/src/plexchat/plexchat.ts) as Azure Open AI embed and chat proxies. We also provide [a factory to instantiate the worker](https://github.com/chuanqisun/plexchat/blob/master/src/plexchat/plexchat-worker.ts) against Azure Open AI specific endpoints
-
 
 ### Polling convention
 

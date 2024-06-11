@@ -1,6 +1,7 @@
 import type { ChatInput, ChatModelName, ChatOutput, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
+import type { IChatTaskManagerStatus } from "../scheduler/types";
 import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker";
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
@@ -33,12 +34,12 @@ export interface PlexchatConfig {
    * Estimate the number of tokens needed for chat task
    * By default, tokens are calculated with gptTokenier
    */
-  onEstimateChatTokenDemand?: (input: ChatInput) => number | Promise<number>;
+  onEstimateChatTokenDemand?: (input: ChatInput, context?: { models?: ChatModelName[] }) => number | Promise<number>;
   /**
    * Estimate the number of tokens needed for embedding task
    * By default, tokens are calculated with gptTokenier
    */
-  onEstimateEmbedTokenDemand?: (input: EmbedInput) => number | Promise<number>;
+  onEstimateEmbedTokenDemand?: (input: EmbedInput, context?: { models?: EmbedModelName[] }) => number | Promise<number>;
   /**
    * Sweep rules reject tasks with error. Use this to clean up hanging tasks that are not making progress
    * By default, sweep rules remove tasks running long than 30 seconds
@@ -56,7 +57,15 @@ export interface PlexchatConfig {
   onInitSortRules?: (existingRules: SortRule[]) => SortRule[];
 }
 
-export function plexchat(config: PlexchatConfig) {
+export interface Plexchat {
+  abort: (abortHandle: string) => void;
+  abortAll: () => void;
+  chatProxy: SimpleChatProxy;
+  embedProxy: SimpleEmbedProxy;
+  status: () => IChatTaskManagerStatus;
+}
+
+export function plexchat(config: PlexchatConfig): Plexchat {
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getPlexchatWorkers({ logLevel: config.logLevel, ...manifest })),
     logLevel: config.logLevel ?? LogLevel.Error,
@@ -89,7 +98,7 @@ export function plexchat(config: PlexchatConfig) {
 
     return manager.submit({
       tokenDemand: await estimators.onEstimateChatTokenDemand(finalInput),
-      models: models ?? ["gpt-35-turbo", "gpt-35-turbo-16k"],
+      models: models ?? ["gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
       abortHandle,
       input: finalInput,
       metadata,
@@ -98,11 +107,13 @@ export function plexchat(config: PlexchatConfig) {
 
   const abortAll = () => manager.abortAll();
   const abort = (abortHandle: string) => manager.abort((task) => task.abortHandle === abortHandle);
+  const status = () => manager.status();
 
   return {
     abort,
     abortAll,
     chatProxy,
     embedProxy,
+    status,
   };
 }
