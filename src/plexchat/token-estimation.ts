@@ -19,7 +19,7 @@ export async function defaultEstimateEmbedTokenDemand(input: EmbedInput, context
 function estimateImageTokenDemand(input: ChatInput) {
   return input.messages.reduce((acc, cur) => {
     if (Array.isArray(cur.content)) {
-      // naive conservative estimate based on 2048 * 2048 image
+      // naive estimate. For reference, a 1366*768 HD mockup of Azure Portal is about 1000 tokens
       return acc + cur.content.filter((part) => part.type === "image_url").reduce((prev, _current) => 1000 + prev, 0);
     } else {
       return acc;
