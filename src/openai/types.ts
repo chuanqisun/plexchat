@@ -2,7 +2,7 @@
 
 // doc: https://learn.microsoft.com/en-us/azure/cognitive-services/openai/reference
 export interface ChatInput {
-  messages: ChatMessage[];
+  messages: ChatInputMessage[];
   tools?: ChatCompletionTool[];
   tool_choice?: ChatCompletionToolChoice;
   temperature: number;
@@ -56,7 +56,7 @@ export type ChatOutput = {
   choices: {
     finish_reason: "stop" | "length" | "content_filter" | null;
     index: number;
-    message: ChatMessage;
+    message: ChatOutputMessage;
   }[];
   usage: {
     completion_tokens: number;
@@ -65,10 +65,18 @@ export type ChatOutput = {
   };
 };
 
-export interface ChatMessage {
+export interface ChatInputMessage {
   role: "assistant" | "system" | "user" | "tool" | "function";
   content: ChatMessagePart[] | string | null;
   name?: string;
+  tool_calls?: ChatCompletionMessageToolCall[];
+  /** @deprecated use `tool_calls` instead */
+  function_call?: ChatCompletionMeesageToolCallFunction;
+}
+
+export interface ChatOutputMessage {
+  role: "assistant";
+  content: string | null;
   tool_calls?: ChatCompletionMessageToolCall[];
   /** @deprecated use `tool_calls` instead */
   function_call?: ChatCompletionMeesageToolCallFunction;
