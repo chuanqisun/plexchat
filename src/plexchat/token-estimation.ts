@@ -1,5 +1,5 @@
 import gptTokenzier from "gpt-tokenizer";
-import type { ChatInput, ChatMessage, ChatModelName, EmbedInput } from "../openai/types";
+import type { ChatInput, ChatInputMessage, ChatModelName, EmbedInput } from "../openai/types";
 
 export async function defaultEstimateChatTokenDemand(input: ChatInput, context?: { models?: ChatModelName[] }) {
   const chatTokenDemand = gptTokenzier.encodeChat(normalizeMessages(input.messages), "gpt-3.5-turbo").length * 1.2 + estimateImageTokenDemand(input);
@@ -28,7 +28,7 @@ function estimateImageTokenDemand(input: ChatInput) {
 }
 
 /** convert function call message to assistant message */
-function normalizeMessages(chatMessage: ChatMessage[]) {
+function normalizeMessages(chatMessage: ChatInputMessage[]) {
   return chatMessage.map((message) => ({
     role: message.role === "tool" || message.role === "function" ? "assistant" : message.role,
     content:
@@ -36,7 +36,7 @@ function normalizeMessages(chatMessage: ChatMessage[]) {
   }));
 }
 
-function selectNonImageContent(message: ChatMessage) {
+function selectNonImageContent(message: ChatInputMessage) {
   if (typeof message.content === "string") {
     return message.content;
   } else if (Array.isArray(message.content)) {
