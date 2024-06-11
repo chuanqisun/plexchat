@@ -67,11 +67,26 @@ export type ChatOutput = {
 
 export interface ChatMessage {
   role: "assistant" | "system" | "user" | "tool" | "function";
-  content: string | null;
+  content: ChatMessagePart[] | string | null;
   name?: string;
   tool_calls?: ChatCompletionMessageToolCall[];
   /** @deprecated use `tool_calls` instead */
   function_call?: ChatCompletionMeesageToolCallFunction;
+}
+
+export interface ChatMessageImagePart {
+  type: "image_url";
+  image_url: {
+    url: string;
+    detail?: "auto" | "low" | "high";
+  };
+}
+
+export type ChatMessagePart = ChatMessageTextPart | ChatMessageImagePart;
+
+export interface ChatMessageTextPart {
+  type: "text";
+  text: string;
 }
 
 export interface ChatCompletionMessageToolCall {
