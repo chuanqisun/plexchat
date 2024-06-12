@@ -150,26 +150,18 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     return matchedTask.task;
   }
 
-  public respond(task: IChatTask, result: IWorkerTaskResponse, hasMore?: boolean) {
+  public respond(task: IChatTask, result: IWorkerTaskResponse) {
     const taskHandle = this.taskHandles.find((t) => t.task === task);
-    if (!taskHandle) {
-      this.logger.warn(`[manager] task handle already removed, no-op`);
-      return;
-    }
-
-    const removeHandle = () => {
-      taskHandle.isRunning = false;
-      this.taskHandles = this.taskHandles.filter((t) => t !== taskHandle);
-    };
+    if (!taskHandle) return this.logger.warn(`[manager] task handle already removed, respond is no-op`);
 
     if (result.error && !result.shouldRetry) {
       // remove handle in any error case
-      removeHandle();
+      this.endHandle(taskHandle);
       this.logger.info(`[manager] Non-retryable error`, result.error);
       taskHandle.subject.error(result.error);
     } else if (result.error) {
       // remove handle in any error case
-      removeHandle();
+      this.endHandle(taskHandle);
       taskHandle.retryLeft--;
 
       if (!taskHandle.retryLeft) {
@@ -182,14 +174,23 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
       }
     } else {
       taskHandle.subject.next(result.data!);
-      if (!hasMore) {
-        removeHandle();
-        taskHandle.subject.complete();
-      }
     }
+  }
+
+  public close(task: IChatTask) {
+    const taskHandle = this.taskHandles.find((t) => t.task === task);
+    if (!taskHandle) return this.logger.warn(`[manager] task handle already removed, close is no-op`);
+
+    this.endHandle(taskHandle);
+    taskHandle.subject.complete();
 
     const runningTasks = this.taskHandles.filter((t) => t.isRunning);
     this.logger.info(`[manager] ${this.taskHandles.length - runningTasks.length} waiting | ${runningTasks.length} running`);
+  }
+
+  private endHandle(handle: TaskHandle) {
+    handle.isRunning = false;
+    this.taskHandles = this.taskHandles.filter((t) => t !== handle);
   }
 
   public status() {

@@ -219,6 +219,7 @@ export class ChatWorker implements IChatWorker {
 
     const shouldRetry = !isUserAborted && hasError;
     manager.respond(taskHandle.task, { data, error, shouldRetry });
+    manager.close(taskHandle.task);
 
     // After each run, restart the poller because capacity might have changed
     // But do not restart if user wants to stop the program
