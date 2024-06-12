@@ -46,4 +46,24 @@ describe("e2e", () => {
     expect(typeof response.choices[0].message.content).toBe("string");
     expect(response.choices[0].message.content?.length).toBeGreaterThan(0);
   });
+
+  it("simple embed", async () => {
+    const response = await instance.chatProxy(
+      {
+        max_tokens: 10,
+        messages: [
+          {
+            role: "user",
+            content: "Hello!",
+          },
+        ],
+      },
+      {
+        models: ["gpt-4o"],
+      }
+    );
+
+    expect(typeof response.choices[0].message.content).toBe("string");
+    expect(response.choices[0].message.content?.length).toBeGreaterThan(0);
+  });
 });
