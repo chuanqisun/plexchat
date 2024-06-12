@@ -6,9 +6,10 @@ import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
 export type SimpleChatProxy = (input: SimpleChatInput, context?: SimpleChatContext) => Promise<ChatOutput>;
-export type SimpleChatStreamProxy = (input: SimpleChatInput, context?: SimpleChatContext) => AsyncIterable<ChatOutputStreamEvent>;
+export type SimpleChatStreamProxy = (input: SimpleChatStreamInput, context?: SimpleChatContext) => AsyncIterable<ChatOutputStreamEvent>;
 
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages">;
+export type SimpleChatStreamInput = Partial<ChatInput> & Pick<ChatInput, "messages"> & { stream: true };
 export type SimpleChatContext = { models?: ChatModelName[]; abortHandle?: string; metadata?: Record<string, any> };
 
 export type SimpleEmbedProxy = (input: SimpleEmbedInput, context?: SimpleEmbedContext) => Promise<EmbedOutput>;

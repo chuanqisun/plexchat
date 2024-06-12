@@ -23,6 +23,7 @@ export interface ChatWorkerConfig {
 }
 
 export type WorkerChatProxy = (input: any, init?: RequestInit) => Promise<WorkerChatProxyResult>;
+export type WorkerChatStreamProxy = (input: any, init?: RequestInit) => AsyncGenerator<WorkerChatProxyResult>;
 
 export interface WorkerChatProxyResult {
   data?: any;

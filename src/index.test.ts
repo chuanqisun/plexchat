@@ -64,6 +64,7 @@ describe("e2e", () => {
 
   it("streaming", async () => {
     const responseIter = instance.chatStreamProxy({
+      stream: true,
       messages: [
         {
           role: "user",

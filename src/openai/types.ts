@@ -12,6 +12,7 @@ export interface ChatInput {
   max_tokens: number;
   response_format?: ChatCompletionResponseFormat;
   stop: null | string | string[];
+  stream?: boolean;
 
   /** @deprecate use `tools` instead */
   functions?: FunctionDefinition[];
