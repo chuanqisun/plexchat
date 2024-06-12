@@ -6,7 +6,8 @@
   "homepage": "https://github.com/chuanqisun/plexchat",
   "types": "src/index.ts",
   "scripts": {
-    "test": "tsx ./src/index.test.ts"
+    "dev": "vitest",
+    "test": "vitest run"
   },
   "repository": {
     "type": "git",
@@ -17,7 +18,8 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^20.4.1",
-    "tsx": "^3.12.7"
+    "tsx": "^3.12.7",
+    "vitest": "^1.6.0"
   },
   "dependencies": {
     "gpt-tokenizer": "^2.1.2"
