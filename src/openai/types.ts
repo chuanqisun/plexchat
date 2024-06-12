@@ -65,6 +65,29 @@ export type ChatOutput = {
   };
 };
 
+/**
+ * Different from Open AI, the initial no-Delta event and the last "DONE" event are implicit as the iterator starts and ends
+ */
+export type ChatOutputStreamEvent = {
+  id: string;
+  object: string;
+  model?: string;
+  created?: number;
+  /** This array can be empty on the first event */
+  choices: {
+    finish_reason: "stop" | "length" | "content_filter" | null;
+    index: number;
+    message: ChatOutputMessage;
+    delta: ChatOutputStreamDelta;
+  }[];
+};
+
+/** The delta object can be empty on the last event */
+export interface ChatOutputStreamDelta {
+  role?: "user" | "assistant";
+  content?: string;
+}
+
 export interface ChatInputMessage {
   role: "assistant" | "system" | "user" | "tool" | "function";
   content: ChatMessagePart[] | string | null;

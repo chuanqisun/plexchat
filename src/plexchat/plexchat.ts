@@ -1,4 +1,4 @@
-import type { ChatInput, ChatModelName, ChatOutput, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
+import type { ChatInput, ChatModelName, ChatOutput, ChatOutputStreamEvent, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
 import type { IChatTaskManagerStatus } from "../scheduler/types";
@@ -6,6 +6,8 @@ import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
 export type SimpleChatProxy = (input: SimpleChatInput, context?: SimpleChatContext) => Promise<ChatOutput>;
+export type SimpleChatStreamProxy = (input: SimpleChatInput, context?: SimpleChatContext) => AsyncIterable<ChatOutputStreamEvent>;
+
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages">;
 export type SimpleChatContext = { models?: ChatModelName[]; abortHandle?: string; metadata?: Record<string, any> };
 
@@ -61,6 +63,7 @@ export interface Plexchat {
   abort: (abortHandle: string) => void;
   abortAll: () => void;
   chatProxy: SimpleChatProxy;
+  chatStreamProxy: SimpleChatStreamProxy;
   embedProxy: SimpleEmbedProxy;
   status: () => IChatTaskManagerStatus;
 }
@@ -105,6 +108,17 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     });
   };
 
+  const chatStreamProxy: SimpleChatStreamProxy = async function* (input, context) {
+    const { models, abortHandle, metadata } = context ?? {};
+    const finalInput = { ...defaultChatInput, ...input };
+
+    // TODO implement stream in manager
+
+    for await (const event of []) {
+      yield event;
+    }
+  };
+
   const abortAll = () => manager.abortAll();
   const abort = (abortHandle: string) => manager.abort((task) => task.abortHandle === abortHandle);
   const status = () => manager.status();
@@ -113,6 +127,7 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     abort,
     abortAll,
     chatProxy,
+    chatStreamProxy,
     embedProxy,
     status,
   };

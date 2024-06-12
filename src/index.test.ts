@@ -61,4 +61,15 @@ describe("e2e", () => {
     expect(Array.isArray(response.data)).toBe(true);
     expect(response.data[0].embedding.length).toBe(1536);
   });
+
+  it("streaming", async () => {
+    const responseIter = instance.chatStreamProxy({
+      messages: [
+        {
+          role: "user",
+          content: "Hello!",
+        },
+      ],
+    });
+  });
 });
