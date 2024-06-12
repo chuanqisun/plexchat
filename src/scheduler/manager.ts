@@ -1,11 +1,11 @@
+import { ReplaySubject, Subject } from "rxjs";
 import { LogLevel, getLogger, type ILogger } from "./logger";
 import { globalTimeout, matchByModel, matchByToken } from "./rules";
 import type { IChatTask, IChatTaskManager, IChatWorker, IChatWorkerManager, IWorkerTaskRequest, IWorkerTaskResponse } from "./types";
 
 interface TaskHandle {
   task: IChatTask;
-  resolve: (result: any) => void;
-  reject: (error: any) => void;
+  subject: Subject<any>;
   isRunning?: boolean;
   retryLeft: number;
   createdAt: number;
@@ -79,7 +79,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
 
       const reason = removal.reason ?? "(no reason povided)";
       this.logger.warn(`[manager] task removed ${reason}`);
-      t.reject(new Error(`task removed ${reason}`));
+      t.subject.error(new Error(`task removed ${reason}`));
 
       if (t.isRunning) {
         // Sweep conducts forced removal. Remove the handle even if it is owned by the worker
@@ -100,18 +100,18 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     return customRules?.(defaultRules) ?? defaultRules;
   }
 
-  public async submit(task: IChatTask) {
-    return new Promise<any>((resolve, reject) => {
-      const taskHandle: TaskHandle = {
-        task,
-        retryLeft: 3,
-        resolve,
-        reject,
-        createdAt: Date.now(),
-      };
+  public submit(task: IChatTask) {
+    const taskSubject = new ReplaySubject<any>();
+    const taskHandle: TaskHandle = {
+      task,
+      retryLeft: 3,
+      subject: taskSubject,
+      createdAt: Date.now(),
+    };
 
-      this.announceNewTask(taskHandle);
-    });
+    this.announceNewTask(taskHandle);
+
+    return taskSubject;
   }
 
   public abortAll() {
@@ -163,19 +163,21 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
 
     if (result.error && !result.shouldRetry) {
       this.logger.info(`[manager] Non-retryable error`, result.error);
-      taskHandle.reject(result.error);
+      taskHandle.subject.error(result.error);
     } else if (result.error) {
       taskHandle.retryLeft--;
       if (!taskHandle.retryLeft) {
         this.logger.warn(`[manager] no retry left`);
-        taskHandle.reject(result.error);
+        taskHandle.subject.error(result.error);
       } else {
         this.logger.warn(`[manager] task requeued, ${taskHandle.retryLeft} retries left`, result.error);
         // TODO need renew controller
         this.announceNewTask(taskHandle);
       }
     } else {
-      taskHandle.resolve(result.data!);
+      // TODO handle stream, do not complete until stream ends
+      taskHandle.subject.next(result.data!);
+      taskHandle.subject.complete();
     }
 
     const runningTasks = this.taskHandles.filter((t) => t.isRunning);

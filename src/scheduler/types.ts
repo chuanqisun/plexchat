@@ -1,5 +1,7 @@
+import type { Observable } from "rxjs";
+
 export interface IChatTaskManager {
-  submit: (task: IChatTask) => Promise<any>;
+  submit: (task: IChatTask) => Observable<any>;
   abortAll: () => void;
   abort: (selectTask: (task: IChatTask) => boolean) => void;
   status: () => IChatTaskManagerStatus;

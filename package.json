@@ -22,6 +22,7 @@
     "vitest": "^1.6.0"
   },
   "dependencies": {
-    "gpt-tokenizer": "^2.1.2"
+    "gpt-tokenizer": "^2.1.2",
+    "rxjs": "^7.8.1"
   }
 }

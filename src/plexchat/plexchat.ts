@@ -1,3 +1,4 @@
+import { firstValueFrom } from "rxjs";
 import type { ChatInput, ChatModelName, ChatOutput, ChatOutputStreamEvent, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
@@ -87,37 +88,35 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     const { models, abortHandle, metadata } = context ?? {};
     const tokenDemand = await estimators.onEstimateEmbedTokenDemand(input);
 
-    return manager.submit({
+    const subject = manager.submit({
       tokenDemand,
       models: models ?? ["text-embedding-ada-002"],
       abortHandle,
       input,
       metadata,
     });
+
+    return firstValueFrom(subject);
   };
 
   const chatProxy: SimpleChatProxy = async (input, context) => {
     const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
 
-    return manager.submit({
+    const subject = manager.submit({
       tokenDemand: await estimators.onEstimateChatTokenDemand(finalInput),
       models: models ?? ["gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
       abortHandle,
       input: finalInput,
       metadata,
     });
+
+    return firstValueFrom(subject);
   };
 
   const chatStreamProxy: SimpleChatStreamProxy = async function* (input, context) {
     const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
-
-    // TODO implement stream in manager
-
-    for await (const event of []) {
-      yield event;
-    }
   };
 
   const abortAll = () => manager.abortAll();
