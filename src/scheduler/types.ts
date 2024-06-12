@@ -19,7 +19,7 @@ export interface IChatManagerStatus {
 
 export interface IChatWorkerManager {
   request: (request: IWorkerTaskRequest) => IChatTask | null;
-  respond: (task: IChatTask, response: IWorkerTaskResponse) => void;
+  respond: (task: IChatTask, response: IWorkerTaskResponse, hasMore?: boolean) => void;
 }
 
 export interface IWorkerTaskRequest {

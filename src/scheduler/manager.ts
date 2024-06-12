@@ -150,22 +150,28 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     return matchedTask.task;
   }
 
-  public respond(task: IChatTask, result: IWorkerTaskResponse) {
+  public respond(task: IChatTask, result: IWorkerTaskResponse, hasMore?: boolean) {
     const taskHandle = this.taskHandles.find((t) => t.task === task);
     if (!taskHandle) {
       this.logger.warn(`[manager] task handle already removed, no-op`);
       return;
     }
 
-    // remove task handle from list
-    taskHandle.isRunning = false;
-    this.taskHandles = this.taskHandles.filter((t) => t !== taskHandle);
+    const removeHandle = () => {
+      taskHandle.isRunning = false;
+      this.taskHandles = this.taskHandles.filter((t) => t !== taskHandle);
+    };
 
     if (result.error && !result.shouldRetry) {
+      // remove handle in any error case
+      removeHandle();
       this.logger.info(`[manager] Non-retryable error`, result.error);
       taskHandle.subject.error(result.error);
     } else if (result.error) {
+      // remove handle in any error case
+      removeHandle();
       taskHandle.retryLeft--;
+
       if (!taskHandle.retryLeft) {
         this.logger.warn(`[manager] no retry left`);
         taskHandle.subject.error(result.error);
@@ -175,9 +181,11 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
         this.announceNewTask(taskHandle);
       }
     } else {
-      // TODO handle stream, do not complete until stream ends
       taskHandle.subject.next(result.data!);
-      taskHandle.subject.complete();
+      if (!hasMore) {
+        removeHandle();
+        taskHandle.subject.complete();
+      }
     }
 
     const runningTasks = this.taskHandles.filter((t) => t.isRunning);
