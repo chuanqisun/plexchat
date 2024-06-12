@@ -34,7 +34,12 @@ export interface WorkerChatProxyResult {
 export interface TaskRecord {
   startedAt: number;
   tokensDemanded: number;
-  tokensUsed?: number;
+  /**
+   * TODO: revise record based on actual token consumption.
+   * At the moment:
+   * It is unclear whether Azure uses actual token consumption in rate limit
+   * In addition, streaming mode does not produce token usage stats
+   */
 }
 
 export interface WorkerTaskHandle {
@@ -200,7 +205,6 @@ export class ChatWorker implements IChatWorker {
     unwatch();
 
     // remove task from running task pool
-    record.tokensUsed = data?.usage?.total_tokens;
     this.tasks = this.tasks.filter((t) => t !== taskHandle);
     const hasError = error !== undefined;
 
