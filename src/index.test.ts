@@ -14,7 +14,13 @@ const instance = plexchat({
           contextWindow: 128_000,
           rpm: 2_700,
           tpm: 450_000,
-          apiVersion: "2024-02-15-preview",
+        },
+        {
+          deploymentName: "text-embedding-ada-002",
+          modelName: "text-embedding-ada-002",
+          contextWindow: 2_048,
+          rpm: 720,
+          tpm: 120_000,
         },
       ],
     },
@@ -48,22 +54,11 @@ describe("e2e", () => {
   });
 
   it("simple embed", async () => {
-    const response = await instance.chatProxy(
-      {
-        max_tokens: 10,
-        messages: [
-          {
-            role: "user",
-            content: "Hello!",
-          },
-        ],
-      },
-      {
-        models: ["gpt-4o"],
-      }
-    );
+    const response = await instance.embedProxy({
+      input: "Hello!",
+    });
 
-    expect(typeof response.choices[0].message.content).toBe("string");
-    expect(response.choices[0].message.content?.length).toBeGreaterThan(0);
+    expect(Array.isArray(response.data)).toBe(true);
+    expect(response.data[0].embedding.length).toBe(1536);
   });
 });
