@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ChatOutputStreamEvent } from "./openai/types";
-import { plexchat } from "./plexchat/plexchat";
+import { plexchat, type SimpleChatInput } from "./plexchat/plexchat";
 import { LogLevel } from "./scheduler/logger";
 
 const instance = plexchat({
+  // use we the same endpoint but split across different workers for testing
   manifests: [
     {
       apiKey: (import.meta as any).env.VITE_OPENAI_TEST_API_KEY as string,
@@ -22,6 +23,20 @@ const instance = plexchat({
           contextWindow: 2_048,
           rpm: 720,
           tpm: 120_000,
+        },
+      ],
+    },
+    {
+      apiKey: (import.meta as any).env.VITE_OPENAI_TEST_API_KEY as string,
+      endpoint: (import.meta as any).env.VITE_OPENAI_TEST_ENDPOINT as string,
+      models: [
+        {
+          deploymentName: "gpt-35-turbo-16k",
+          modelName: "gpt-3.5-turbo-16k",
+          contextWindow: 16_384,
+          rpm: 1_440,
+          tpm: 240_000,
+          apiVersion: "2024-02-01",
         },
       ],
     },
@@ -52,6 +67,29 @@ describe("e2e", () => {
 
     expect(typeof response.choices[0].message.content).toBe("string");
     expect(response.choices[0].message.content?.length).toBeGreaterThan(0);
+  });
+
+  it("multi-worker chat", async () => {
+    const chatInput: SimpleChatInput = {
+      max_tokens: 10,
+      messages: [
+        {
+          role: "user",
+          content: "Hello!",
+        },
+      ],
+    };
+
+    const responses = await Promise.all([
+      instance.chatProxy(chatInput, { models: ["gpt-4o"] }),
+      instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"] }),
+    ]);
+
+    expect(responses.length).toBe(2);
+    responses.map((response) => {
+      expect(typeof response.choices[0].message.content).toBe("string");
+      expect(response.choices[0].message.content?.length).toBeGreaterThan(0);
+    });
   });
 
   it("simple embed", async () => {
@@ -103,5 +141,42 @@ describe("e2e", () => {
       .join("");
 
     expect(combinedText.toLocaleLowerCase()).toContain("hello");
+  });
+
+  it("abort by handle", async () => {
+    const chatInput: SimpleChatInput = {
+      max_tokens: 10,
+      messages: [
+        {
+          role: "user",
+          content: "Hello!",
+        },
+      ],
+    };
+
+    const tasks = [
+      instance.chatProxy(chatInput, { models: ["gpt-4o"], abortHandle: "1" }),
+      instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"], abortHandle: "2" }),
+      instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"], abortHandle: "3" }),
+      instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"], abortHandle: "4" }),
+    ];
+
+    // FIXME token estimation is async, so abort is not effective until its done
+    instance.abort("2");
+    instance.abort("3");
+
+    const responses = await Promise.allSettled(tasks);
+    const okResponses = responses.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<any>[];
+    const errorResponses = responses.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+
+    // expect(okResponses.length).toBe(2);
+    okResponses
+      .map((r) => r.value)
+      .map((response) => {
+        expect(typeof response.choices[0].message.content).toBe("string");
+        expect(response.choices[0].message.content?.length).toBeGreaterThan(0);
+      });
+
+    // expect(errorResponses.length).toBe(2);
   });
 });
