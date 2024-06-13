@@ -1,3 +1,27 @@
+# v1.1.0
+
+- Added: stream mode
+
+# v1.0.5
+
+- Added: image input for vision models
+
+# v1.0.1
+
+- Added: status api
+
+# v0.18.0
+
+- Added: json mode support
+
+# v0.16.0
+
+- Added: richer logging
+
+# v0.14.0
+
+- Added: gpt-4o models
+
 # v0.13.0
 
 - Added: `SortRule` support for custom priority
