@@ -1,4 +1,4 @@
-import { ReplaySubject, Subject } from "rxjs";
+import { ReplaySubject, Subject, tap } from "rxjs";
 import { LogLevel, getLogger, type ILogger } from "./logger";
 import { globalTimeout, matchByModel, matchByToken } from "./rules";
 import type { IChatTask, IChatTaskManager, IChatWorker, IChatWorkerManager, IWorkerTaskCloseReason, IWorkerTaskRequest, IWorkerTaskResponse } from "./types";
@@ -111,7 +111,7 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
 
     this.announceNewTask(taskHandle);
 
-    return taskSubject;
+    return taskSubject.pipe(tap({ unsubscribe: () => this.abort((t) => t === task) }));
   }
 
   public abortAll() {

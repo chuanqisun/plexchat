@@ -1,4 +1,4 @@
-import { Observable, concatMap, firstValueFrom, from, tap } from "rxjs";
+import { Observable, concatMap, firstValueFrom, from, of, tap } from "rxjs";
 import type { ChatInput, ChatModelName, ChatOutput, ChatOutputStreamEvent, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
@@ -73,6 +73,19 @@ export interface Plexchat {
 export function plexchat(config: PlexchatConfig): Plexchat {
   // The abort handles are only used for out-of-manager tasks, such as token estimation
   const abortHandleMap = new Map<string, AbortController>();
+  const ensureController = (abortHandle?: string) => {
+    const abortController = abortHandle ? abortHandleMap.get(abortHandle) ?? new AbortController() : new AbortController();
+    if (abortHandle && !abortHandleMap.has(abortHandle)) abortHandleMap.set(abortHandle, abortController);
+    return abortController;
+  };
+  const abortByHandle = (abortHandle: string) => {
+    abortHandleMap.get(abortHandle)?.abort();
+    abortHandleMap.delete(abortHandle);
+  };
+  const abortAllHandles = () => {
+    abortHandleMap.forEach((abortController) => abortController.abort());
+    abortHandleMap.clear();
+  };
 
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getPlexchatWorkers({ logLevel: config.logLevel, ...manifest })),
@@ -90,8 +103,7 @@ export function plexchat(config: PlexchatConfig): Plexchat {
   const embedProxy: SimpleEmbedProxy = async (input, context) => {
     const { models, abortHandle, metadata } = context ?? {};
 
-    const abortController = abortHandle ? abortHandleMap.get(abortHandle) ?? new AbortController() : new AbortController();
-    if (abortHandle && !abortHandleMap.has(abortHandle)) abortHandleMap.set(abortHandle, abortController);
+    const abortController = ensureController(abortHandle);
 
     const tokenDemand = await estimators.onEstimateEmbedTokenDemand(input, { signal: abortController.signal });
 
@@ -110,8 +122,7 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
 
-    const abortController = abortHandle ? abortHandleMap.get(abortHandle) ?? new AbortController() : new AbortController();
-    if (abortHandle && !abortHandleMap.has(abortHandle)) abortHandleMap.set(abortHandle, abortController);
+    const abortController = ensureController(abortHandle);
 
     const $task = from(Promise.resolve(estimators.onEstimateChatTokenDemand(finalInput, { signal: abortController.signal }))).pipe(
       tap(() => abortController.signal.throwIfAborted()),
@@ -133,11 +144,11 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
 
-    const abortController = abortHandle ? abortHandleMap.get(abortHandle) ?? new AbortController() : new AbortController();
-    if (abortHandle && !abortHandleMap.has(abortHandle)) abortHandleMap.set(abortHandle, abortController);
+    const abortController = ensureController(abortHandle);
 
-    // TODO support auto abort on unsubscribe
-    return from(Promise.resolve(estimators.onEstimateChatTokenDemand(finalInput, { signal: abortController.signal }))).pipe(
+    return of(null).pipe(
+      tap({ unsubscribe: () => abortController.abort() }),
+      concatMap(() => Promise.resolve(estimators.onEstimateChatTokenDemand(finalInput, { signal: abortController.signal }))),
       tap(() => abortController.signal.throwIfAborted()),
       concatMap((tokenDemand) =>
         manager.submit({
@@ -152,14 +163,12 @@ export function plexchat(config: PlexchatConfig): Plexchat {
   };
 
   const abortAll = () => {
-    abortHandleMap.forEach((abortController) => abortController.abort());
-    abortHandleMap.clear();
+    abortAllHandles();
     manager.abortAll();
   };
 
   const abort = (abortHandle: string) => {
-    abortHandleMap.get(abortHandle)?.abort();
-    abortHandleMap.delete(abortHandle);
+    abortByHandle(abortHandle);
     manager.abort((task) => task.abortHandle === abortHandle);
   };
   const status = () => manager.status();

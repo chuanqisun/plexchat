@@ -208,4 +208,46 @@ describe("e2e", () => {
     expect(errorResponses.length).toBe(4);
     expect(errorResponses[0].reason.name).toBe("AbortError");
   });
+
+  it.only("abort stream", async () => {
+    const responseIter = instance.chatStreamProxy(
+      {
+        stream: true,
+        max_tokens: 10,
+        messages: [
+          {
+            role: "system",
+            content: "just say `Hello` back`",
+          },
+          {
+            role: "user",
+            content: "Hello!",
+          },
+        ],
+      },
+      {
+        models: ["gpt-4o"],
+        abortHandle: "1",
+      }
+    );
+
+    const collectedResponse: ChatOutputStreamEvent[] = [];
+    const onStreamEnd = Promise.withResolvers<any>();
+    responseIter.subscribe({
+      next: (response) => {
+        collectedResponse.push(response);
+      },
+      error: (error) => {
+        onStreamEnd.resolve(error);
+      },
+      complete: () => {
+        onStreamEnd.resolve(collectedResponse);
+      },
+    });
+
+    instance.abort("1");
+    const err = await onStreamEnd.promise;
+    expect(collectedResponse.length).toBe(0);
+    expect(err.name).toBe("AbortError");
+  });
 });
