@@ -1,3 +1,7 @@
+# unreleased v1.1.1
+
+- Fixed: Abort control does not take effect until task started
+
 # v1.1.0
 
 - Added: stream mode
