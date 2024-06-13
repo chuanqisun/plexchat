@@ -1,4 +1,6 @@
+import { catchError, first, last, map, of, tap, type Observable } from "rxjs";
 import { TIMEOUT_ABORT_REASON, withTimeout } from "../controller/timeout";
+import { RetryableError } from "../openai/proxy";
 import { getCapacity, getWindowedUsage } from "./capacity";
 import { LogLevel, getLogger, type ILogger } from "./logger";
 import { Poller } from "./poller";
@@ -22,8 +24,8 @@ export interface ChatWorkerConfig {
   metadata?: Record<string, any>;
 }
 
-export type WorkerChatProxy = (input: any, init?: RequestInit) => Promise<WorkerChatProxyResult>;
-export type WorkerChatStreamProxy = (input: any, init?: RequestInit) => AsyncGenerator<WorkerChatProxyResult>;
+/** The proxy must convert all possible errors to the Result type  */
+export type WorkerChatProxy = (input: any, init?: RequestInit) => Observable<any>;
 
 export interface WorkerChatProxyResult {
   data?: any;
@@ -199,36 +201,48 @@ export class ChatWorker implements IChatWorker {
     this.capacityRecords.push(record);
 
     const unwatch = withTimeout(TIMEOUT_ABORT_REASON, this.config.timeout(taskHandle.task.tokenDemand), taskHandle.controller);
-    const { error, data, retryAfterMs } = await this.config
+
+    // we rely on the abort signal to trigger an error. There is no need to manually unsubscribe
+    let wasEmitting = false;
+    const subscription = this.config
       .proxy(taskHandle.task.input, { signal: taskHandle.controller.signal })
-      .catch((error) => ({ data: undefined, error, retryAfterMs: undefined }));
-    unwatch();
+      .pipe(
+        map((result) => ({ data: result, error: undefined })),
+        tap((successResponse) => {
+          manager.respond(taskHandle.task, successResponse);
+          wasEmitting = true;
+        }),
+        last(), // take last success
+        catchError((error) => {
+          // handle cooldown
+          if ((error as RetryableError).retryAfterMs !== undefined) {
+            this.coolDownUntil = Date.now() + error.retryAfterMs;
+            this.logger.warn(`[worker] reject task with cooldown ${error.retryAfterMs}ms`);
+          }
 
-    // remove task from running task pool
-    this.tasks = this.tasks.filter((t) => t !== taskHandle);
-    const hasError = error !== undefined;
+          // log timeout rejection
+          if (taskHandle.controller.signal.reason === TIMEOUT_ABORT_REASON) {
+            this.logger.warn(`[worker] reject task without cooldown due to timeout`);
+          }
 
-    if (hasError) {
-      if (retryAfterMs !== undefined) {
-        this.coolDownUntil = Date.now() + retryAfterMs;
-        this.logger.warn(`[worker] reject task with cooldown ${retryAfterMs}ms`);
-      }
+          return of({ data: undefined, error: (error as any)?.message ?? "Unknown error" });
+        }),
+        first(), // take first error
+        map((firstErrorOrLastResult) => {
+          this.tasks = this.tasks.filter((t) => t !== taskHandle);
+          const isUserAborted = taskHandle.controller.signal.aborted && taskHandle.controller.signal.reason.abortReason !== TIMEOUT_ABORT_REASON;
 
-      if (taskHandle.controller.signal.reason === TIMEOUT_ABORT_REASON) {
-        this.logger.warn(`[worker] reject task without cooldown`);
-      }
-    }
+          // we must NOT retry once some data is emitted
+          const shouldRetry = !wasEmitting && !isUserAborted && firstErrorOrLastResult.error !== undefined;
 
-    const isUserAborted = taskHandle.controller.signal.aborted && taskHandle.controller.signal.reason.abortReason !== TIMEOUT_ABORT_REASON;
+          manager.close(taskHandle.task, { error: firstErrorOrLastResult.error, shouldRetry });
+          unwatch();
 
-    const shouldRetry = !isUserAborted && hasError;
-    manager.respond(taskHandle.task, { data, error, shouldRetry });
-    manager.close(taskHandle.task);
-
-    // After each run, restart the poller because capacity might have changed
-    // But do not restart if user wants to stop the program
-    if (!isUserAborted) {
-      this.start(manager);
-    }
+          // After each run, restart the poller because capacity might have changed
+          // But do not restart if user wants to stop the program
+          if (!isUserAborted) this.start(manager);
+        })
+      )
+      .subscribe();
   }
 }

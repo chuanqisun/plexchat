@@ -1,7 +1,7 @@
 import { ReplaySubject, Subject } from "rxjs";
 import { LogLevel, getLogger, type ILogger } from "./logger";
 import { globalTimeout, matchByModel, matchByToken } from "./rules";
-import type { IChatTask, IChatTaskManager, IChatWorker, IChatWorkerManager, IWorkerTaskRequest, IWorkerTaskResponse } from "./types";
+import type { IChatTask, IChatTaskManager, IChatWorker, IChatWorkerManager, IWorkerTaskCloseReason, IWorkerTaskRequest, IWorkerTaskResponse } from "./types";
 
 interface TaskHandle {
   task: IChatTask;
@@ -154,43 +154,40 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     const taskHandle = this.taskHandles.find((t) => t.task === task);
     if (!taskHandle) return this.logger.warn(`[manager] task handle already removed, respond is no-op`);
 
-    if (result.error && !result.shouldRetry) {
-      // remove handle in any error case
-      this.endHandle(taskHandle);
-      this.logger.info(`[manager] Non-retryable error`, result.error);
-      taskHandle.subject.error(result.error);
-    } else if (result.error) {
-      // remove handle in any error case
-      this.endHandle(taskHandle);
-      taskHandle.retryLeft--;
-
-      if (!taskHandle.retryLeft) {
-        this.logger.warn(`[manager] no retry left`);
-        taskHandle.subject.error(result.error);
-      } else {
-        this.logger.warn(`[manager] task requeued, ${taskHandle.retryLeft} retries left`, result.error);
-        // TODO need renew controller
-        this.announceNewTask(taskHandle);
-      }
-    } else {
-      taskHandle.subject.next(result.data!);
-    }
+    taskHandle.subject.next(result.data!);
   }
 
-  public close(task: IChatTask) {
+  public close(task: IChatTask, reason?: IWorkerTaskCloseReason) {
     const taskHandle = this.taskHandles.find((t) => t.task === task);
     if (!taskHandle) return this.logger.warn(`[manager] task handle already removed, close is no-op`);
 
     this.endHandle(taskHandle);
-    taskHandle.subject.complete();
 
-    const runningTasks = this.taskHandles.filter((t) => t.isRunning);
-    this.logger.info(`[manager] ${this.taskHandles.length - runningTasks.length} waiting | ${runningTasks.length} running`);
+    if (reason?.error && !reason.shouldRetry) {
+      this.logger.info(`[manager] Non-retryable error`, reason.error);
+      taskHandle.subject.error(reason.error);
+    } else if (reason?.error) {
+      taskHandle.retryLeft--;
+
+      if (!taskHandle.retryLeft) {
+        this.logger.warn(`[manager] no retry left`);
+        taskHandle.subject.error(reason.error);
+      } else {
+        this.logger.warn(`[manager] task requeued, ${taskHandle.retryLeft} retries left`, reason.error);
+        // TODO, we shouldn't reuse the abort controller in retry
+        this.announceNewTask(taskHandle);
+      }
+    } else {
+      taskHandle.subject.complete();
+    }
   }
 
   private endHandle(handle: TaskHandle) {
     handle.isRunning = false;
     this.taskHandles = this.taskHandles.filter((t) => t !== handle);
+
+    const runningTasks = this.taskHandles.filter((t) => t.isRunning);
+    this.logger.info(`[manager] ${this.taskHandles.length - runningTasks.length} waiting | ${runningTasks.length} running`);
   }
 
   public status() {

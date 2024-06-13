@@ -20,7 +20,7 @@ export interface IChatManagerStatus {
 export interface IChatWorkerManager {
   request: (request: IWorkerTaskRequest) => IChatTask | null;
   respond: (task: IChatTask, response: IWorkerTaskResponse) => void;
-  close: (task: IChatTask) => void;
+  close: (task: IChatTask, reason?: IWorkerTaskCloseReason) => void;
 }
 
 export interface IWorkerTaskRequest {
@@ -30,7 +30,10 @@ export interface IWorkerTaskRequest {
 }
 
 export interface IWorkerTaskResponse {
-  data?: any;
+  data: any;
+}
+
+export interface IWorkerTaskCloseReason {
   error?: any;
   shouldRetry?: boolean;
 }
