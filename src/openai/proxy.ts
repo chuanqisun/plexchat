@@ -1,6 +1,6 @@
-import { Observable, concatMap, from } from "rxjs";
+import { concatMap, from } from "rxjs";
 import type { ILogger } from "../scheduler/logger";
-import type { WorkerChatProxy, WorkerChatProxyResult } from "../scheduler/worker";
+import type { WorkerChatProxy } from "../scheduler/worker";
 import type { ChatInput } from "./types";
 
 export interface ProxyConfig {
@@ -10,9 +10,9 @@ export interface ProxyConfig {
 }
 export function getOpenAIWorkerProxy({ apiKey, endpoint, logger }: ProxyConfig): WorkerChatProxy {
   return (input: ChatInput, init?: RequestInit) => {
-    const $result: Observable<WorkerChatProxyResult> = from(fetchResponse({ apiKey, endpoint, logger }, input, init)).pipe(
+    const $result = from(fetchResponse({ apiKey, endpoint, logger }, input, init)).pipe(
       concatMap((res) => validateOpenAIResponse(endpoint, res)),
-      concatMap((res) => res.json())
+      concatMap((res) => from(input.stream ? responseToStream(res) : res.json()))
     );
 
     return $result;
@@ -61,14 +61,7 @@ export class RetryableError extends Error {
   }
 }
 
-async function responseToJSON(response: Response): Promise<WorkerChatProxyResult> {
-  const result = (await response.json()) as any;
-  return {
-    data: result,
-  } satisfies WorkerChatProxyResult;
-}
-
-async function* responseToStream(response: Response): AsyncGenerator<WorkerChatProxyResult> {
+async function* responseToStream(response: Response): AsyncGenerator {
   if (!response.body) throw new Error("Response body is empty");
 
   const reader = response.body.getReader();
@@ -86,9 +79,7 @@ async function* responseToStream(response: Response): AsyncGenerator<WorkerChatP
       const item = JSON.parse(match[1]);
       if ((item as any)?.error?.message) throw new Error((item as any).error.message);
       if (!Array.isArray(item?.choices)) throw new Error("Invalid response");
-      yield {
-        data: item,
-      };
+      yield item;
     }
   }
 }
