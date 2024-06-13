@@ -1,7 +1,7 @@
 import gptTokenzier from "gpt-tokenizer";
 import type { ChatInput, ChatInputMessage, ChatModelName, EmbedInput } from "../openai/types";
 
-export async function defaultEstimateChatTokenDemand(input: ChatInput, context?: { models?: ChatModelName[] }) {
+export async function defaultEstimateChatTokenDemand(input: ChatInput, context?: { models?: ChatModelName[]; signal: AbortSignal }) {
   const chatTokenDemand = gptTokenzier.encodeChat(normalizeMessages(input.messages), "gpt-3.5-turbo").length * 1.2 + estimateImageTokenDemand(input);
   const functionCallTokenDemand = input.functions ? gptTokenzier.encode(JSON.stringify(input.functions)).length * 1.2 : 0;
   const responseTokenDemand = input.max_tokens;
@@ -9,7 +9,7 @@ export async function defaultEstimateChatTokenDemand(input: ChatInput, context?:
   return chatTokenDemand + functionCallTokenDemand + responseTokenDemand;
 }
 
-export async function defaultEstimateEmbedTokenDemand(input: EmbedInput, context?: { models: ChatModelName[] }) {
+export async function defaultEstimateEmbedTokenDemand(input: EmbedInput, context?: { models?: ChatModelName[]; signal: AbortSignal }) {
   const arrayifiedInput = Array.isArray(input.input) ? input.input : [input.input];
   const tokenDemand = arrayifiedInput.map((str) => gptTokenzier.encode(str)).reduce((acc, cur) => acc + cur.length, 0);
 

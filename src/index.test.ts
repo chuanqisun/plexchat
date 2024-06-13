@@ -41,7 +41,7 @@ const instance = plexchat({
       ],
     },
   ],
-  logLevel: LogLevel.Error,
+  logLevel: LogLevel.Info,
 });
 
 describe("e2e", () => {
@@ -161,7 +161,6 @@ describe("e2e", () => {
       instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"], abortHandle: "4" }),
     ];
 
-    // FIXME token estimation is async, so abort is not effective until its done
     instance.abort("2");
     instance.abort("3");
 
@@ -169,7 +168,7 @@ describe("e2e", () => {
     const okResponses = responses.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<any>[];
     const errorResponses = responses.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
 
-    // expect(okResponses.length).toBe(2);
+    expect(okResponses.length).toBe(2);
     okResponses
       .map((r) => r.value)
       .map((response) => {
@@ -177,6 +176,36 @@ describe("e2e", () => {
         expect(response.choices[0].message.content?.length).toBeGreaterThan(0);
       });
 
-    // expect(errorResponses.length).toBe(2);
+    expect(errorResponses.length).toBe(2);
+    expect(errorResponses[0].reason.name).toBe("AbortError");
+  });
+
+  it("abort all", async () => {
+    const chatInput: SimpleChatInput = {
+      max_tokens: 10,
+      messages: [
+        {
+          role: "user",
+          content: "Hello!",
+        },
+      ],
+    };
+
+    const tasks = [
+      instance.chatProxy(chatInput, { models: ["gpt-4o"], abortHandle: "1" }),
+      instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"], abortHandle: "2" }),
+      instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"], abortHandle: "3" }),
+      instance.chatProxy(chatInput, { models: ["gpt-3.5-turbo-16k"], abortHandle: "4" }),
+    ];
+
+    instance.abortAll();
+
+    const responses = await Promise.allSettled(tasks);
+    const okResponses = responses.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<any>[];
+    const errorResponses = responses.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+
+    expect(okResponses.length).toBe(0);
+    expect(errorResponses.length).toBe(4);
+    expect(errorResponses[0].reason.name).toBe("AbortError");
   });
 });

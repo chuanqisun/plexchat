@@ -1,4 +1,4 @@
-import { Observable, concatMap, firstValueFrom, from } from "rxjs";
+import { Observable, concatMap, firstValueFrom, from, tap } from "rxjs";
 import type { ChatInput, ChatModelName, ChatOutput, ChatOutputStreamEvent, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
@@ -38,12 +38,12 @@ export interface PlexchatConfig {
    * Estimate the number of tokens needed for chat task
    * By default, tokens are calculated with gptTokenier
    */
-  onEstimateChatTokenDemand?: (input: ChatInput, context?: { models?: ChatModelName[] }) => number | Promise<number>;
+  onEstimateChatTokenDemand?: (input: ChatInput, context?: { models?: ChatModelName[]; signal?: AbortSignal }) => number | Promise<number>;
   /**
    * Estimate the number of tokens needed for embedding task
    * By default, tokens are calculated with gptTokenier
    */
-  onEstimateEmbedTokenDemand?: (input: EmbedInput, context?: { models?: EmbedModelName[] }) => number | Promise<number>;
+  onEstimateEmbedTokenDemand?: (input: EmbedInput, context?: { models?: EmbedModelName[]; signal?: AbortSignal }) => number | Promise<number>;
   /**
    * Sweep rules reject tasks with error. Use this to clean up hanging tasks that are not making progress
    * By default, sweep rules remove tasks running long than 30 seconds
@@ -71,6 +71,9 @@ export interface Plexchat {
 }
 
 export function plexchat(config: PlexchatConfig): Plexchat {
+  // The abort handles are only used for out-of-manager tasks, such as token estimation
+  const abortHandleMap = new Map<string, AbortController>();
+
   const manager = new ChatManager({
     workers: config.manifests.flatMap((manifest) => getPlexchatWorkers({ logLevel: config.logLevel, ...manifest })),
     logLevel: config.logLevel ?? LogLevel.Error,
@@ -86,7 +89,11 @@ export function plexchat(config: PlexchatConfig): Plexchat {
 
   const embedProxy: SimpleEmbedProxy = async (input, context) => {
     const { models, abortHandle, metadata } = context ?? {};
-    const tokenDemand = await estimators.onEstimateEmbedTokenDemand(input);
+
+    const abortController = abortHandle ? abortHandleMap.get(abortHandle) ?? new AbortController() : new AbortController();
+    if (abortHandle && !abortHandleMap.has(abortHandle)) abortHandleMap.set(abortHandle, abortController);
+
+    const tokenDemand = await estimators.onEstimateEmbedTokenDemand(input, { signal: abortController.signal });
 
     const subject = manager.submit({
       tokenDemand,
@@ -103,23 +110,35 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
 
-    const subject = manager.submit({
-      tokenDemand: await estimators.onEstimateChatTokenDemand(finalInput),
-      models: models ?? ["gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
-      abortHandle,
-      input: finalInput,
-      metadata,
-    });
+    const abortController = abortHandle ? abortHandleMap.get(abortHandle) ?? new AbortController() : new AbortController();
+    if (abortHandle && !abortHandleMap.has(abortHandle)) abortHandleMap.set(abortHandle, abortController);
 
-    return firstValueFrom(subject);
+    const $task = from(Promise.resolve(estimators.onEstimateChatTokenDemand(finalInput, { signal: abortController.signal }))).pipe(
+      tap(() => abortController.signal.throwIfAborted()),
+      concatMap((tokenDemand) =>
+        manager.submit({
+          tokenDemand,
+          models: models ?? ["gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
+          abortHandle,
+          input: finalInput,
+          metadata,
+        })
+      )
+    );
+
+    return firstValueFrom($task);
   };
 
   const chatStreamProxy: SimpleChatStreamProxy = (input, context) => {
     const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
 
+    const abortController = abortHandle ? abortHandleMap.get(abortHandle) ?? new AbortController() : new AbortController();
+    if (abortHandle && !abortHandleMap.has(abortHandle)) abortHandleMap.set(abortHandle, abortController);
+
     // TODO support auto abort on unsubscribe
-    return from(Promise.resolve(estimators.onEstimateChatTokenDemand(finalInput))).pipe(
+    return from(Promise.resolve(estimators.onEstimateChatTokenDemand(finalInput, { signal: abortController.signal }))).pipe(
+      tap(() => abortController.signal.throwIfAborted()),
       concatMap((tokenDemand) =>
         manager.submit({
           tokenDemand,
@@ -132,8 +151,17 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     );
   };
 
-  const abortAll = () => manager.abortAll();
-  const abort = (abortHandle: string) => manager.abort((task) => task.abortHandle === abortHandle);
+  const abortAll = () => {
+    abortHandleMap.forEach((abortController) => abortController.abort());
+    abortHandleMap.clear();
+    manager.abortAll();
+  };
+
+  const abort = (abortHandle: string) => {
+    abortHandleMap.get(abortHandle)?.abort();
+    abortHandleMap.delete(abortHandle);
+    manager.abort((task) => task.abortHandle === abortHandle);
+  };
   const status = () => manager.status();
 
   return {
