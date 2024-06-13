@@ -7,6 +7,8 @@ High throughput Azure OpenAI Chat Client.
 - Customizable tokenzier for either estimated (fast) or precise (slow) token length control
 - Built-in retry based on HTTP header and heuristics
 - Built-in queue for burst of traffic
+- Support streaming mode
+- Status API for usage monitoring
 
 ## Get started
 
@@ -111,7 +113,6 @@ For user convenience, we provide [a factory to instantiate the manager](https://
 ## Future work
 
 - Customizable prioritization rules for the task queue
-- Server-sent events (SSE) for chat response
 - HTTP based remote workers
 - Docker-deployable HTTP server
 - Automatic rate limit detection by Azure Open AI admin API
