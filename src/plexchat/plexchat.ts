@@ -1,4 +1,4 @@
-import { firstValueFrom } from "rxjs";
+import { Observable, concatMap, firstValueFrom, from } from "rxjs";
 import type { ChatInput, ChatModelName, ChatOutput, ChatOutputStreamEvent, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
@@ -7,7 +7,7 @@ import { getPlexchatWorkers, type PlexEndpointManifest } from "./plexchat-worker
 import { defaultEstimateChatTokenDemand, defaultEstimateEmbedTokenDemand } from "./token-estimation";
 
 export type SimpleChatProxy = (input: SimpleChatInput, context?: SimpleChatContext) => Promise<ChatOutput>;
-export type SimpleChatStreamProxy = (input: SimpleChatStreamInput, context?: SimpleChatContext) => AsyncIterable<ChatOutputStreamEvent>;
+export type SimpleChatStreamProxy = (input: SimpleChatStreamInput, context?: SimpleChatContext) => Observable<ChatOutputStreamEvent>;
 
 export type SimpleChatInput = Partial<ChatInput> & Pick<ChatInput, "messages">;
 export type SimpleChatStreamInput = Partial<ChatInput> & Pick<ChatInput, "messages"> & { stream: true };
@@ -114,9 +114,22 @@ export function plexchat(config: PlexchatConfig): Plexchat {
     return firstValueFrom(subject);
   };
 
-  const chatStreamProxy: SimpleChatStreamProxy = async function* (input, context) {
+  const chatStreamProxy: SimpleChatStreamProxy = (input, context) => {
     const { models, abortHandle, metadata } = context ?? {};
     const finalInput = { ...defaultChatInput, ...input };
+
+    // TODO support auto abort on unsubscribe
+    return from(Promise.resolve(estimators.onEstimateChatTokenDemand(finalInput))).pipe(
+      concatMap((tokenDemand) =>
+        manager.submit({
+          tokenDemand,
+          models: models ?? ["gpt-3.5-turbo", "gpt-3.5-turbo-16k"],
+          abortHandle,
+          input: finalInput,
+          metadata,
+        })
+      )
+    );
   };
 
   const abortAll = () => manager.abortAll();

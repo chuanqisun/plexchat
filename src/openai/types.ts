@@ -78,7 +78,6 @@ export type ChatOutputStreamEvent = {
   choices: {
     finish_reason: "stop" | "length" | "content_filter" | null;
     index: number;
-    message: ChatOutputMessage;
     delta: ChatOutputStreamDelta;
   }[];
 };

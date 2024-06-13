@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ChatOutputStreamEvent } from "./openai/types";
 import { plexchat } from "./plexchat/plexchat";
 import { LogLevel } from "./scheduler/logger";
 
@@ -63,14 +64,44 @@ describe("e2e", () => {
   });
 
   it("streaming", async () => {
-    const responseIter = instance.chatStreamProxy({
-      stream: true,
-      messages: [
-        {
-          role: "user",
-          content: "Hello!",
-        },
-      ],
+    const responseIter = instance.chatStreamProxy(
+      {
+        stream: true,
+        max_tokens: 10,
+        messages: [
+          {
+            role: "system",
+            content: "just say `Hello` back`",
+          },
+          {
+            role: "user",
+            content: "Hello!",
+          },
+        ],
+      },
+      {
+        models: ["gpt-4o"],
+      }
+    );
+
+    const collectedResponse: ChatOutputStreamEvent[] = [];
+    const onStreamEnd = Promise.withResolvers<any>();
+    responseIter.subscribe({
+      next: (response) => {
+        collectedResponse.push(response);
+      },
+      complete: () => {
+        onStreamEnd.resolve(collectedResponse);
+      },
     });
+
+    await onStreamEnd.promise;
+    expect(collectedResponse.length).toBeGreaterThan(0);
+    const combinedText = collectedResponse
+      .flatMap((r) => r.choices.map((c) => c.delta.content))
+      .filter(Boolean)
+      .join("");
+
+    expect(combinedText.toLocaleLowerCase()).toContain("hello");
   });
 });
