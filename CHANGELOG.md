@@ -1,5 +1,6 @@
-# unreleased v1.1.1
+# v1.1.1
 
+- Added: Auto-abort when unsubscribing from the stream mode
 - Fixed: Abort control does not take effect until task started
 
 # v1.1.0
