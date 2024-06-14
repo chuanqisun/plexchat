@@ -135,6 +135,8 @@ describe("e2e", () => {
 
     await onStreamEnd.promise;
     expect(collectedResponse.length).toBeGreaterThan(0);
+    expect(collectedResponse.every((entry) => Array.isArray(entry.choices))).toBe(true);
+
     const combinedText = collectedResponse
       .flatMap((r) => r.choices.map((c) => c.delta.content))
       .filter(Boolean)
