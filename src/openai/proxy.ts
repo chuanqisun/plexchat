@@ -67,6 +67,8 @@ async function* responseToStream(response: Response): AsyncGenerator {
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8");
 
+  let unfinishedLine = "";
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
@@ -74,9 +76,20 @@ async function* responseToStream(response: Response): AsyncGenerator {
     }
     // Massage and parse the chunk of data
     const chunk = decoder.decode(value);
-    const matches = chunk.matchAll(/^data: (\{.*\})$/gm);
+
+    // because the packets can split anywhere, we only process whole lines
+    const currentWindow = unfinishedLine + chunk;
+    unfinishedLine = currentWindow.slice(currentWindow.lastIndexOf("\n") + 1);
+
+    const wholeLines = currentWindow
+      .slice(0, currentWindow.lastIndexOf("\n") + 1)
+      .split("\n")
+      .filter(Boolean);
+
+    const matches = wholeLines.map((wholeLine) => [...wholeLine.matchAll(/^data: (\{.*\})$/g)][0]?.[1]).filter(Boolean);
+
     for (const match of matches) {
-      const item = JSON.parse(match[1]);
+      const item = JSON.parse(match);
       if ((item as any)?.error?.message) throw new Error((item as any).error.message);
       if (!Array.isArray(item?.choices)) throw new Error("Invalid response");
       yield item;

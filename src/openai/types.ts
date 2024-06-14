@@ -11,6 +11,7 @@ export interface ChatInput {
   presence_penalty: number;
   max_tokens: number;
   response_format?: ChatCompletionResponseFormat;
+  seed?: number;
   stop: null | string | string[];
   stream?: boolean;
 

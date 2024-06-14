@@ -1,3 +1,7 @@
+# v1.1.2
+
+- Fixed: stream mode did not handle parital events
+
 # v1.1.1
 
 - Added: Auto-abort when unsubscribing from the stream mode
