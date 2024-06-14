@@ -209,7 +209,7 @@ describe("e2e", () => {
     expect(errorResponses[0].reason.name).toBe("AbortError");
   });
 
-  it.only("abort stream", async () => {
+  it("abort stream", async () => {
     const responseIter = instance.chatStreamProxy(
       {
         stream: true,
