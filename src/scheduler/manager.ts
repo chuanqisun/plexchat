@@ -111,7 +111,14 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
 
     this.announceNewTask(taskHandle);
 
-    return taskSubject.pipe(tap({ unsubscribe: () => this.abort((t) => t === task) }));
+    return taskSubject.pipe(
+      tap({
+        unsubscribe: () => {
+          this.logger.info(`[manager] task unsubscribed, will abort`);
+          this.abort((t) => t === task);
+        },
+      })
+    );
   }
 
   public abortAll() {
