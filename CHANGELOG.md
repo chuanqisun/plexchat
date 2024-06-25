@@ -1,3 +1,7 @@
+# v1.1.3
+
+- Added: more debug logging during neogotiation
+
 # v1.1.2
 
 - Fixed: stream mode did not handle parital events
