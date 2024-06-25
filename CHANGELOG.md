@@ -1,10 +1,14 @@
-# v1.1.3
+# v1.1.5
 
-- Added: more debug logging during neogotiation
+- Fixed: Prematured unsubscribe from tasks
+
+# v1.1.4
+
+- Added: More debug logging during neogotiation
 
 # v1.1.2
 
-- Fixed: stream mode did not handle parital events
+- Fixed: Stream mode did not handle parital events
 
 # v1.1.1
 
@@ -13,23 +17,23 @@
 
 # v1.1.0
 
-- Added: stream mode
+- Added: Stream mode
 
 # v1.0.5
 
-- Added: image input for vision models
+- Added: Image input for vision models
 
 # v1.0.1
 
-- Added: status api
+- Added: Status api
 
 # v0.18.0
 
-- Added: json mode support
+- Added: Json mode support
 
 # v0.16.0
 
-- Added: richer logging
+- Added: Richer logging
 
 # v0.14.0
 
