@@ -143,7 +143,10 @@ export class ChatManager implements IChatTaskManager, IChatWorkerManager {
     const matchedTask = this.getMatchedTask(req, pendingTasks);
 
     if (!matchedTask) {
-      this.logger.debug(`[manager] no task found from ${pendingTasks.length} pending tasks`);
+      this.logger.debug(
+        `[manager] no task found from ${pendingTasks.length} pending tasks:`,
+        pendingTasks.map((t) => ({ tokenDemand: t.task.tokenDemand, model: t.task.models }))
+      );
       return null;
     }
 

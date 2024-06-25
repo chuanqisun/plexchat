@@ -141,6 +141,7 @@ export class ChatWorker implements IChatWorker {
   private getTaskRequest(): IWorkerTaskRequest {
     // Blocked due to cooldown
     if (this.coolDownUntil > Date.now()) {
+      this.logger.debug(`[worker] skip poll due to cooldown`);
       return {
         tokenCapacity: 0,
         models: this.config.models,
@@ -150,6 +151,7 @@ export class ChatWorker implements IChatWorker {
 
     // Blocked due to max concurrency
     if (this.tasks.length >= this.config.concurrency) {
+      this.logger.debug(`[worker] skip poll due to concurrency limit`);
       return {
         tokenCapacity: 0,
         models: this.config.models,
@@ -161,6 +163,7 @@ export class ChatWorker implements IChatWorker {
 
     // Blocked due to Requests limit
     if (capacity.requests === 0) {
+      this.logger.debug(`[worker] skip poll due to request limit`);
       return {
         tokenCapacity: 0,
         models: this.config.models,
@@ -168,11 +171,17 @@ export class ChatWorker implements IChatWorker {
       };
     }
 
-    return {
+    const poll = {
       tokenCapacity: Math.min(this.config.contextWindow, capacity.tokens),
       models: this.config.models,
       metadata: this.config.metadata,
     };
+    this.logger.debug(`[worker] polling`, {
+      tokenCapacity: poll.tokenCapacity,
+      models: poll.models,
+    });
+
+    return poll;
   }
 
   private poll(manager: IChatWorkerManager, request: IWorkerTaskRequest) {
