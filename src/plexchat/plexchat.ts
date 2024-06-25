@@ -1,4 +1,4 @@
-import { Observable, concatMap, firstValueFrom, from, of, tap } from "rxjs";
+import { Observable, concatMap, from, lastValueFrom, of, tap } from "rxjs";
 import type { ChatInput, ChatModelName, ChatOutput, ChatOutputStreamEvent, EmbedInput, EmbedModelName, EmbedOutput } from "../openai/types";
 import { LogLevel } from "../scheduler/logger";
 import { ChatManager, type MatchRule, type SortRule, type SweepRule } from "../scheduler/manager";
@@ -115,7 +115,7 @@ export function plexchat(config: PlexchatConfig): Plexchat {
       metadata,
     });
 
-    return firstValueFrom(subject);
+    return lastValueFrom(subject);
   };
 
   const chatProxy: SimpleChatProxy = async (input, context) => {
@@ -137,7 +137,7 @@ export function plexchat(config: PlexchatConfig): Plexchat {
       )
     );
 
-    return firstValueFrom($task);
+    return lastValueFrom($task);
   };
 
   const chatStreamProxy: SimpleChatStreamProxy = (input, context) => {
