@@ -1,3 +1,7 @@
+# v1.2.
+
+- Added: distribute .js files
+
 # v1.1.5
 
 - Fixed: Prematured unsubscribe from tasks

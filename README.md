@@ -106,10 +106,6 @@ For user convenience, we provide [a factory to instantiate the manager](https://
 - Manager wakes up workers upon receiving every new task
 - Worker polls indefinitely, and goes to sleep after they received at least one task and finished all assigned tasks.
 
-## Limitations
-
-- Only support **TypeScript** bundlers (e.g. vite, esbuild). Vanilla js is not distributed in the package
-
 ## Future work
 
 - Customizable prioritization rules for the task queue
