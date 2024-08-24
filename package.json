@@ -2,10 +2,21 @@
   "name": "plexchat",
   "version": "1.1.5",
   "description": "High throughput Azure OpenAI Chat Client",
-  "main": "src/index.ts",
   "homepage": "https://github.com/chuanqisun/plexchat",
-  "types": "src/index.ts",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
   "scripts": {
+    "build": "tsc && esbuild  --bundle ./src/index.ts --outfile=./dist/index.js --format=esm",
     "dev": "vitest",
     "test": "vitest run"
   },
@@ -18,11 +29,12 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^20.4.1",
-    "tsx": "^3.12.7",
-    "vitest": "^1.6.0"
+    "esbuild": "^0.23.1",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
   },
   "dependencies": {
-    "gpt-tokenizer": "^2.1.2",
+    "gpt-tokenizer": "^2.2.1",
     "rxjs": "^7.8.1"
   }
 }
