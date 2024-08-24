@@ -154,5 +154,5 @@ export interface EmbedOutput {
   };
 }
 
-export type ChatModelName = "gpt-3.5-turbo" | "gpt-3.5-turbo-16k" | "gpt-4" | "gpt-4-32k" | "gpt-4o";
-export type EmbedModelName = "text-embedding-ada-002";
+export type ChatModelName = "gpt-3.5-turbo" | "gpt-3.5-turbo-16k" | "gpt-4" | "gpt-4-32k" | "gpt-4o" | "gpt-4o-mini";
+export type EmbedModelName = "text-embedding-ada-002" | "text-embedding-3-small" | "text-embedding-3-large";
