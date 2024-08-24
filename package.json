@@ -1,6 +1,6 @@
 {
   "name": "plexchat",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "High throughput Azure OpenAI Chat Client",
   "homepage": "https://github.com/chuanqisun/plexchat",
   "type": "module",
