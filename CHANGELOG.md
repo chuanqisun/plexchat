@@ -1,3 +1,7 @@
+# v1.3.0
+
+- Added: Type definition for new models
+
 # v1.2.1
 
 - Fixed: Missing type declaration
