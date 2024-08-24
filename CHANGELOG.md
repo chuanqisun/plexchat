@@ -1,6 +1,10 @@
-# v1.2.
+# v1.2.1
 
-- Added: distribute .js files
+- Fixed: Missing type declaration
+
+# v1.2.0
+
+- Added: Distribute .js files
 
 # v1.1.5
 
