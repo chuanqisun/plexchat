@@ -1,3 +1,7 @@
+# v1.4.0
+
+- Added: Structured output
+
 # v1.3.0
 
 - Added: Type definition for new models
