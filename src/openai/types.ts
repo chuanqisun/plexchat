@@ -44,7 +44,12 @@ export interface ChatCompletionNamedToolChoice {
 }
 
 export interface ChatCompletionResponseFormat {
-  type: "json_object" | "text";
+  type: "json_schema" | "json_object" | "text";
+  json_schema?: {
+    name: string;
+    schema: any;
+    strict: boolean;
+  };
 }
 
 export type ToolChoiceDetails = {
